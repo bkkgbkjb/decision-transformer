@@ -13,6 +13,7 @@ from decision_transformer.models.decision_transformer import DecisionTransformer
 from decision_transformer.models.mlp_bc import MLPBCModel
 from decision_transformer.training.act_trainer import ActTrainer
 from decision_transformer.training.seq_trainer import SequenceTrainer
+from reporter import get_reporter
 
 
 def discount_cumsum(x, gamma):
@@ -113,6 +114,7 @@ def experiment(
     sorted_inds = sorted_inds[-num_trajectories:]
 
     # used to reweight sampling so we sample according to timesteps instead of trajectories
+    # TODO: 这里好像有问题，并不是在根据timesteps做sample
     p_sample = traj_lens[sorted_inds] / sum(traj_lens[sorted_inds])
 
     def get_batch(batch_size=256, max_len=K):
@@ -125,10 +127,14 @@ def experiment(
 
         s, a, r, d, rtg, timesteps, mask = [], [], [], [], [], [], []
         for i in range(batch_size):
+            # TODO: 这里好像是优先级sample
             traj = trajectories[int(sorted_inds[batch_inds[i]])]
             si = random.randint(0, traj['rewards'].shape[0] - 1)
 
             # get sequences from dataset
+
+            # reshape是在unsqueeze(0)
+            # 如果si取到很后面的，si + max_len 就会超界，此时tlen < max_len
             s.append(traj['observations'][si:si + max_len].reshape(1, -1, state_dim))
             a.append(traj['actions'][si:si + max_len].reshape(1, -1, act_dim))
             r.append(traj['rewards'][si:si + max_len].reshape(1, -1, 1))
@@ -137,17 +143,21 @@ def experiment(
             else:
                 d.append(traj['dones'][si:si + max_len].reshape(1, -1))
             timesteps.append(np.arange(si, si + s[-1].shape[1]).reshape(1, -1))
+            assert not (timesteps[-1] >= max_ep_len).any()
             timesteps[-1][timesteps[-1] >= max_ep_len] = max_ep_len-1  # padding cutoff
             rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
             if rtg[-1].shape[1] <= s[-1].shape[1]:
                 rtg[-1] = np.concatenate([rtg[-1], np.zeros((1, 1, 1))], axis=1)
 
             # padding and state + reward normalization
+
+            # TODO: 为什么在前面padding
             tlen = s[-1].shape[1]
             s[-1] = np.concatenate([np.zeros((1, max_len - tlen, state_dim)), s[-1]], axis=1)
             s[-1] = (s[-1] - state_mean) / state_std
             a[-1] = np.concatenate([np.ones((1, max_len - tlen, act_dim)) * -10., a[-1]], axis=1)
             r[-1] = np.concatenate([np.zeros((1, max_len - tlen, 1)), r[-1]], axis=1)
+            # TODO: 为什么要乘2
             d[-1] = np.concatenate([np.ones((1, max_len - tlen)) * 2, d[-1]], axis=1)
             rtg[-1] = np.concatenate([np.zeros((1, max_len - tlen, 1)), rtg[-1]], axis=1) / scale
             timesteps[-1] = np.concatenate([np.zeros((1, max_len - tlen)), timesteps[-1]], axis=1)
@@ -266,18 +276,20 @@ def experiment(
         )
 
     if log_to_wandb:
-        wandb.init(
-            name=exp_prefix,
-            group=group_name,
-            project='decision-transformer',
-            config=variant
-        )
+        # wandb.init(
+        #     name=exp_prefix,
+        #     group=group_name,
+        #     project='decision-transformer',
+        #     config=variant
+        # )
+        reporter = get_reporter('dt')
         # wandb.watch(model)  # wandb has some bug
 
     for iter in range(variant['max_iters']):
         outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True)
         if log_to_wandb:
-            wandb.log(outputs)
+            # wandb.log(outputs)
+            reporter(outputs)
 
 
 if __name__ == '__main__':
@@ -298,8 +310,8 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)
     parser.add_argument('--warmup_steps', type=int, default=10000)
     parser.add_argument('--num_eval_episodes', type=int, default=100)
-    parser.add_argument('--max_iters', type=int, default=10)
-    parser.add_argument('--num_steps_per_iter', type=int, default=10000)
+    parser.add_argument('--max_iters', type=int, default=100)
+    parser.add_argument('--num_steps_per_iter', type=int, default=1000)
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
     
