@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 import transformers
+from args import args
 
 from decision_transformer.models.model import TrajectoryModel
 from decision_transformer.models.trajectory_gpt2 import GPT2Model
@@ -47,7 +48,7 @@ class DecisionTransformer(TrajectoryModel):
         # note: we don't predict states or returns for the paper
         self.predict_state = torch.nn.Linear(hidden_size, self.state_dim)
         self.predict_action = nn.Sequential(
-            *([nn.Linear(hidden_size, self.act_dim)] + ([nn.Tanh()] if action_tanh else []))
+            *([nn.Linear(hidden_size if not args.double_x else hidden_size * 2, self.act_dim)] + ([nn.Tanh()] if action_tanh else []))
         )
         self.predict_return = torch.nn.Linear(hidden_size, 1)
 
@@ -91,13 +92,18 @@ class DecisionTransformer(TrajectoryModel):
 
         # reshape x so that the second dimension corresponds to the original
         # returns (0), states (1), or actions (2); i.e. x[:,1,t] is the token for s_t
+        # x.shape == (batch_size, 3, seq_len, hidden_dim)
         x = x.reshape(batch_size, seq_length, 3, self.hidden_size).permute(0, 2, 1, 3)
 
         # get predictions
         # TODO: 为什么用的是 x[:, 2] == action
         return_preds = self.predict_return(x[:,2])  # predict next return given state and action
         state_preds = self.predict_state(x[:,2])    # predict next state given state and action
-        action_preds = self.predict_action(x[:,1])  # predict next action given state
+
+        x_state = x[:, 1] 
+        double_x = torch.cat([x_state, x_state[:, -1].unsqueeze(1).repeat_interleave(seq_length, dim=1)], dim = 2)
+
+        action_preds = self.predict_action(x_state if not args.double_x else double_x)  # predict next action given state
 
         return state_preds, action_preds, return_preds
 
