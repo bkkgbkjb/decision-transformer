@@ -17,6 +17,7 @@ from decision_transformer.models.mlp_bc import MLPBCModel
 from decision_transformer.training.act_trainer import ActTrainer
 from decision_transformer.training.seq_trainer import SequenceTrainer
 from reporter import get_reporter
+from setup import RANDOM_SEED
 
 
 def discount_cumsum(x, gamma):
@@ -63,6 +64,7 @@ def experiment(
         scale = 10.
     else:
         raise NotImplementedError
+    env.seed(RANDOM_SEED)
 
     if model_type == 'bc':
         env_targets = env_targets[:1]  # since BC ignores target, no need for different evaluations
