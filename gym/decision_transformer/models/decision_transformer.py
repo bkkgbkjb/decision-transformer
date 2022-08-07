@@ -48,7 +48,7 @@ class DecisionTransformer(TrajectoryModel):
         # note: we don't predict states or returns for the paper
         self.predict_state = torch.nn.Linear(hidden_size, self.state_dim)
         self.predict_action = nn.Sequential(
-            *([nn.Linear(hidden_size if not args.double_x else hidden_size * 2, self.act_dim)] + ([nn.Tanh()] if action_tanh else []))
+            *([nn.Linear(hidden_size * 2 if (args.double_x or args.mean_x) else hidden_size, self.act_dim)] + ([nn.Tanh()] if action_tanh else []))
         )
         self.predict_return = torch.nn.Linear(hidden_size, 1)
 
@@ -102,8 +102,10 @@ class DecisionTransformer(TrajectoryModel):
 
         x_state = x[:, 1] 
         double_x = torch.cat([x_state, x_state[:, -1].unsqueeze(1).repeat_interleave(seq_length, dim=1)], dim = 2)
+        mean_x = torch.cat([x_state, x_state.mean(dim=1).unsqueeze(1).repeat_interleave(seq_length, dim=1)], dim = 2)
 
-        action_preds = self.predict_action(x_state if not args.double_x else double_x)  # predict next action given state
+        # action_preds = self.predict_action(x_state if not args.double_x else double_x)  # predict next action given state
+        action_preds = self.predict_action(double_x if args.double_x else mean_x if args.mean_x else x_state)  # predict next action given state
 
         return state_preds, action_preds, return_preds
 
