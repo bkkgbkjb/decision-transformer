@@ -100,6 +100,7 @@ class DecisionTransformer(TrajectoryModel):
         return_preds = self.predict_return(x[:,2])  # predict next return given state and action
         state_preds = self.predict_state(x[:,2])    # predict next state given state and action
 
+        # x_state.shape == (batch_size, seq_len, hidden_dim)
         x_state = x[:, 1] 
         double_x = torch.cat([x_state, x_state[:, -1].unsqueeze(1).repeat_interleave(seq_length, dim=1)], dim = 2)
         mean_x = torch.cat([x_state, x_state.mean(dim=1).unsqueeze(1).repeat_interleave(seq_length, dim=1)], dim = 2)
