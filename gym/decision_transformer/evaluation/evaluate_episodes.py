@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from args import args
 
 
 def evaluate_episode(
@@ -122,7 +123,7 @@ def evaluate_episode_rtg(
         rewards[-1] = reward
 
         if mode != 'delayed':
-            pred_return = target_return[0,-1] - (reward/scale)
+            pred_return = target_return[0,-1] - (0 if args.eval_no_change else (reward/scale))
         else:
             pred_return = target_return[0,-1]
         target_return = torch.cat(
