@@ -122,6 +122,7 @@ def experiment(
     # used to reweight sampling so we sample according to timesteps instead of trajectories
     # TODO: 这里好像有问题，并不是在根据timesteps做sample
     p_sample = traj_lens[sorted_inds] / sum(traj_lens[sorted_inds])
+    my_i = 0
 
     def get_batch(batch_size=256, max_len=K):
         batch_inds = np.random.choice(
@@ -156,7 +157,10 @@ def experiment(
                 rtg.append(discount_cumsum(traj['rewards'][0:], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
             else:
                 rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
-            print(f"rtg is: {rtg[-1]}")
+            nonlocal my_i
+            if my_i % 1000 == 0:
+                print(f"rtg is: {rtg[-1]}")
+            my_i += 1
 
             if rtg[-1].shape[1] <= s[-1].shape[1]:
                 rtg[-1] = np.concatenate([rtg[-1], np.zeros((1, 1, 1))], axis=1)
