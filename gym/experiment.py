@@ -44,7 +44,7 @@ def experiment(
     if env_name == 'hopper':
         env = gym.make('Hopper-v3')
         max_ep_len = 1000
-        env_targets = [3600, 1800]  # evaluation conditioning targets
+        env_targets = [3600]  # evaluation conditioning targets
         scale = 1000.  # normalization for rewards/returns
     elif env_name == 'halfcheetah':
         env = gym.make('HalfCheetah-v3')
@@ -153,12 +153,17 @@ def experiment(
             timesteps[-1][timesteps[-1] >= max_ep_len] = max_ep_len-1  # padding cutoff
 
             if args.train_no_change:
-                rtg.append(discount_cumsum(traj['rewards'][0:], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
+                if not args.subepisode:
+                    rtg.append(discount_cumsum(traj['rewards'][0:], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
+                else:
+                    rtg.append((np.sum(traj['rewards'][si:si + s[-1].shape[1]]) * 50).reshape(1,1,1).repeat(s[-1].shape[1] + 1, axis=1))
+
             else:
                 rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
-            print(f"rtg is: {rtg[-1]}")
+            # print(f"rtg is: {rtg[-1]}")
 
             if rtg[-1].shape[1] <= s[-1].shape[1]:
+                assert False
                 rtg[-1] = np.concatenate([rtg[-1], np.zeros((1, 1, 1))], axis=1)
 
             # padding and state + reward normalization
@@ -198,7 +203,7 @@ def experiment(
                             model,
                             max_ep_len=max_ep_len,
                             scale=scale,
-                            target_return=target_rew/scale,
+                            target_return=target_rew/scale if not args.subepisode else target_rew / scale,
                             mode=mode,
                             state_mean=state_mean,
                             state_std=state_std,

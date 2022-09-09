@@ -128,7 +128,7 @@ def evaluate_episode_rtg(
             pred_return = target_return[0,-1]
         target_return = torch.cat(
             [target_return, pred_return.reshape(1, 1)], dim=1)
-        print(f"target_return is: {target_return.detach().cpu().numpy()}")
+        # print(f"target_return is: {target_return.detach().cpu().numpy()}")
         timesteps = torch.cat(
             [timesteps,
              torch.ones((1, 1), device=device, dtype=torch.long) * (t+1)], dim=1)
