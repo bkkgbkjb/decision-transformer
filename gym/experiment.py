@@ -319,7 +319,6 @@ def experiment(
             num_attention_heads=2,
             intermediate_size=4*variant['embed_dim'],
             max_position_embeddings=1024,
-            hidden_act="relu",
             hidden_act=variant['activation_function'],
             hidden_dropout_prob=variant['dropout'],
             attention_probs_dropout_prob=variant['dropout'],
