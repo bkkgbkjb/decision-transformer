@@ -11,11 +11,14 @@ import pickle
 import random
 import sys
 
-from decision_transformer.evaluation.evaluate_episodes import evaluate_episode, evaluate_episode_rtg
+from decision_transformer.evaluation.evaluate_episodes import evaluate_episode, evaluate_episode_rtg, evaluate_episode_phi
 from decision_transformer.models.decision_transformer import DecisionTransformer
+from decision_transformer.models.encoder_transformer import EncoderTransformer
+from decision_transformer.models.preference_decision_transformer import PreferenceDecisionTransformer
 from decision_transformer.models.mlp_bc import MLPBCModel
 from decision_transformer.training.act_trainer import ActTrainer
 from decision_transformer.training.seq_trainer import SequenceTrainer
+from decision_transformer.training.pdt_trainer import PDTTrainer
 from reporter import get_reporter
 from setup import RANDOM_SEED
 
@@ -107,6 +110,8 @@ def experiment(
     num_eval_episodes = variant['num_eval_episodes']
     pct_traj = variant.get('pct_traj', 1.)
 
+    z_dim = 4
+
     # only train on top pct_traj trajectories (for %BC experiment)
     num_timesteps = max(int(pct_traj*num_timesteps), 1)
     sorted_inds = np.argsort(returns)  # lowest to highest
@@ -156,7 +161,8 @@ def experiment(
                 if not args.subepisode:
                     rtg.append(discount_cumsum(traj['rewards'][0:], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
                 else:
-                    rtg.append((np.sum(traj['rewards'][si:si + s[-1].shape[1]]) * 50).reshape(1,1,1).repeat(s[-1].shape[1] + 1, axis=1))
+                    rtg.append(discount_cumsum(traj['rewards'][si:si+200], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
+                    # rtg.append((np.sum(traj['rewards'][si:si + s[-1].shape[1]])).reshape(1,1,1).repeat(s[-1].shape[1] + 1, axis=1))
 
             else:
                 rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
@@ -209,6 +215,20 @@ def experiment(
                             state_std=state_std,
                             device=device,
                         )
+                    elif model_type == 'pdt':
+                        ret, length = evaluate_episode_phi(
+                            env,
+                            state_dim,
+                            act_dim,
+                            model[0],
+                            max_ep_len=max_ep_len,
+                            scale=scale,
+                            phi=(model[1] / torch.linalg.vector_norm(model[1])).unsqueeze(0),
+                            mode=mode,
+                            state_mean=state_mean,
+                            state_std=state_std,
+                            device=device,
+                        )
                     else:
                         ret, length = evaluate_episode(
                             env,
@@ -255,6 +275,22 @@ def experiment(
             hidden_size=variant['embed_dim'],
             n_layer=variant['n_layer'],
         )
+    elif model_type == 'pdt':
+        model = PreferenceDecisionTransformer(
+            state_dim=state_dim,
+            act_dim=act_dim,
+            max_length=K,
+            phi_size=z_dim,
+            max_ep_len=max_ep_len,
+            hidden_size=variant['embed_dim'],
+            n_layer=variant['n_layer'],
+            n_head=variant['n_head'],
+            n_inner=4*variant['embed_dim'],
+            activation_function=variant['activation_function'],
+            n_positions=1024,
+            resid_pdrop=variant['dropout'],
+            attn_pdrop=variant['dropout'],
+        )
     else:
         raise NotImplementedError
 
@@ -270,6 +306,38 @@ def experiment(
         optimizer,
         lambda steps: min((steps+1)/warmup_steps, 1)
     )
+
+    if model_type == 'pdt':
+        en_model = EncoderTransformer(
+            state_dim=state_dim,
+            act_dim=act_dim,
+            hidden_size=variant['embed_dim'],
+            output_size=z_dim,
+            max_length=K,
+            max_ep_len=max_ep_len,
+            num_hidden_layers=3,
+            num_attention_heads=2,
+            intermediate_size=4*variant['embed_dim'],
+            max_position_embeddings=1024,
+            # hidden_act="relu",
+            hidden_act=variant['activation_function'],
+            hidden_dropout_prob=variant['dropout'],
+            attention_probs_dropout_prob=variant['dropout'],
+        )
+        en_model = en_model.to(device=device)
+        et_optimizer = torch.optim.AdamW(
+            en_model.parameters(),
+            lr=1e-4,
+            weight_decay=1e-4
+        )
+
+        w = torch.rand(z_dim).to(device=device)
+        w.requires_grad = True
+        w_optimizer = torch.optim.AdamW(
+            [w],
+            lr=1e-4,
+            weight_decay=1e-4
+        )
 
     if model_type == 'dt':
         trainer = SequenceTrainer(
@@ -290,6 +358,21 @@ def experiment(
             scheduler=scheduler,
             loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
             eval_fns=[eval_episodes(tar) for tar in env_targets],
+        )
+    elif model_type == 'pdt':
+        trainer = PDTTrainer(
+            en_model=en_model,
+            de_model=model,
+            optimizer=optimizer,
+            et_optimizer=et_optimizer,
+            w=w,
+            w_optimizer=w_optimizer,
+            batch_size=batch_size,
+            get_batch=get_batch,
+            scheduler=scheduler,
+            loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
+            eval_fns=[eval_episodes(tar) for tar in env_targets],
+            device=device,
         )
 
     if log_to_wandb:
