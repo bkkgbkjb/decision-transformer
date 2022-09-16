@@ -79,7 +79,7 @@ class PDTTrainer(Trainer):
         logs['training/recon_loss_std'] = np.std(recon_losses)
         logs['training/phi_norm_loss_mean'] = np.mean(phi_norm_losses)
         logs['training/phi_norm_loss_std'] = np.std(phi_norm_losses)
-
+        print(self.w)
         for k in self.diagnostics:
             logs[k] = self.diagnostics[k]
 
@@ -150,13 +150,13 @@ class PDTTrainer(Trainer):
         self.et_optimizer.step()
         self.optimizer.step()
 
-        # TODO: 也要传mask给et
-        phi = self.en_model.forward(states, actions, timesteps, attention_mask).detach()
-        pred_returns = torch.inner(phi, self.w)
-        regress_loss = self.regress_loss(pred_returns, rtg[:,-1])
-        self.w_optimizer.zero_grad()
-        regress_loss.backward()
-        self.w_optimizer.step()
+        # # TODO: 也要传mask给et
+        # phi = self.en_model.forward(states, actions, timesteps, attention_mask).detach()
+        # pred_returns = torch.inner(phi, self.w)
+        # regress_loss = self.regress_loss(pred_returns, rtg[:,-1])
+        # self.w_optimizer.zero_grad()
+        # regress_loss.backward()
+        # self.w_optimizer.step()
 
         with torch.no_grad():
             self.diagnostics['training/action_error'] = torch.mean((action_preds-action_target)**2).detach().cpu().item()

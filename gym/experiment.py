@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import wandb
 import json
-from args import args
+from args import args, name
 
 import argparse
 import pickle
@@ -110,7 +110,10 @@ def experiment(
     num_eval_episodes = variant['num_eval_episodes']
     pct_traj = variant.get('pct_traj', 1.)
 
-    z_dim = 8
+    z_dim = args.z_dim
+    print(f'z_dim is: {z_dim}')
+    print(f"reward foresee is: {args.foresee}")
+
 
     # only train on top pct_traj trajectories (for %BC experiment)
     num_timesteps = max(int(pct_traj*num_timesteps), 1)
@@ -161,7 +164,7 @@ def experiment(
                 if not args.subepisode:
                     rtg.append(discount_cumsum(traj['rewards'][0:], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
                 else:
-                    rtg.append(discount_cumsum(traj['rewards'][si:si+200], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
+                    rtg.append(discount_cumsum(traj['rewards'][si:si+args.foresee], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
                     # rtg.append((np.sum(traj['rewards'][si:si + s[-1].shape[1]])).reshape(1,1,1).repeat(s[-1].shape[1] + 1, axis=1))
 
             else:
@@ -330,8 +333,8 @@ def experiment(
             weight_decay=1e-4
         )
 
-        w = torch.rand(z_dim).to(device=device)
-        w.requires_grad = True
+        w = (torch.randn(z_dim) * 2).to(device=device)
+        # w.requires_grad = True
         w_optimizer = torch.optim.AdamW(
             [w],
             lr=1e-4,
@@ -381,7 +384,7 @@ def experiment(
         #     project='decision-transformer',
         #     config=variant
         # )
-        reporter = get_reporter('dt', exp_name)
+        reporter = get_reporter(name, exp_name)
         # wandb.watch(model)  # wandb has some bug
 
     for iter in range(variant['max_iters']):
