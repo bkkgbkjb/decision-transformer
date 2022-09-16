@@ -102,7 +102,8 @@ class PDTTrainer(Trainer):
 
         action_target = torch.clone(actions)
 
-        _phi = self.en_model.forward(states, actions, timesteps)
+        # TODO: 要传mask给et``
+        _phi = self.en_model.forward(states, actions, timesteps, attention_mask)
         # if self.phi_norm == "hard":
         #     phi = _phi / torch.linalg.vector_norm(_phi.detach(), dim=1).unsqueeze(1)
         # else:
@@ -149,7 +150,8 @@ class PDTTrainer(Trainer):
         self.et_optimizer.step()
         self.optimizer.step()
 
-        phi = self.en_model.forward(states, actions, timesteps).detach()
+        # TODO: 也要传mask给et
+        phi = self.en_model.forward(states, actions, timesteps, attention_mask).detach()
         pred_returns = torch.inner(phi, self.w)
         regress_loss = self.regress_loss(pred_returns, rtg[:,-1])
         self.w_optimizer.zero_grad()

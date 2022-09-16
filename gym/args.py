@@ -25,8 +25,6 @@ parser.add_argument('--train-no-change', type=bool, default=True)
 parser.add_argument('--eval-no-change', type=bool, default=True)
 parser.add_argument('--subepisode', type=bool, default=True)
 parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
-parser.add_argument('--double-x', type=bool, default=False)
-parser.add_argument('--mean-x', type=bool, default=False)
 
 args = parser.parse_args()
 assert not (args.mean_x and args.double_x)

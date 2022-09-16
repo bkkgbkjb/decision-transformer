@@ -110,7 +110,7 @@ def experiment(
     num_eval_episodes = variant['num_eval_episodes']
     pct_traj = variant.get('pct_traj', 1.)
 
-    z_dim = 4
+    z_dim = 8
 
     # only train on top pct_traj trajectories (for %BC experiment)
     num_timesteps = max(int(pct_traj*num_timesteps), 1)
@@ -319,7 +319,7 @@ def experiment(
             num_attention_heads=2,
             intermediate_size=4*variant['embed_dim'],
             max_position_embeddings=1024,
-            # hidden_act="relu",
+            hidden_act="relu",
             hidden_act=variant['activation_function'],
             hidden_dropout_prob=variant['dropout'],
             attention_probs_dropout_prob=variant['dropout'],
