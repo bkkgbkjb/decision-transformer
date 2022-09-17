@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import wandb
 import json
-from args import args, name
+from args import args
 
 import argparse
 import pickle
@@ -21,6 +21,8 @@ from decision_transformer.training.seq_trainer import SequenceTrainer
 from decision_transformer.training.pdt_trainer import PDTTrainer
 from reporter import get_reporter
 from setup import RANDOM_SEED
+
+from d4rl.infos import REF_MIN_SCORE, REF_MAX_SCORE
 
 
 def discount_cumsum(x, gamma):
@@ -114,6 +116,9 @@ def experiment(
     print(f'z_dim is: {z_dim}')
     print(f"reward foresee is: {args.foresee}")
 
+    expert_score = REF_MAX_SCORE[f"{args.env}-{args.dataset}-v2"]
+    random_score = REF_MIN_SCORE[f"{args.env}-{args.dataset}-v2"]
+    print(f"max score is: {expert_score}, min score is {random_score}")
 
     # only train on top pct_traj trajectories (for %BC experiment)
     num_timesteps = max(int(pct_traj*num_timesteps), 1)
@@ -201,7 +206,7 @@ def experiment(
 
     def eval_episodes(target_rew):
         def fn(model):
-            returns, lengths = [], []
+            returns, norm_returns, lengths = [], [], []
             for _ in range(num_eval_episodes):
                 with torch.no_grad():
                     if model_type == 'dt':
@@ -226,7 +231,8 @@ def experiment(
                             model[0],
                             max_ep_len=max_ep_len,
                             scale=scale,
-                            phi=(model[1] / torch.linalg.vector_norm(model[1])).unsqueeze(0),
+                            phi=(model[1]).unsqueeze(0),
+                            # phi=(model[1] / torch.linalg.vector_norm(model[1])).unsqueeze(0),
                             mode=mode,
                             state_mean=state_mean,
                             state_std=state_std,
@@ -245,11 +251,15 @@ def experiment(
                             state_std=state_std,
                             device=device,
                         )
+                norm_ret = (ret - random_score) / (expert_score - random_score) * 100
                 returns.append(ret)
+                norm_returns.append(norm_ret)
                 lengths.append(length)
             return {
                 f'target_{target_rew}_return_mean': np.mean(returns),
                 f'target_{target_rew}_return_std': np.std(returns),
+                f'target_{target_rew}_norm_return_mean': np.mean(norm_returns),
+                f'target_{target_rew}_norm_return_std': np.std(norm_returns),
                 f'target_{target_rew}_length_mean': np.mean(lengths),
                 f'target_{target_rew}_length_std': np.std(lengths),
             }
@@ -334,10 +344,10 @@ def experiment(
         )
 
         w = (torch.randn(z_dim) * 2).to(device=device)
-        # w.requires_grad = True
+        w.requires_grad = True
         w_optimizer = torch.optim.AdamW(
             [w],
-            lr=1e-4,
+            lr=1e-2,
             weight_decay=1e-4
         )
 
@@ -384,6 +394,8 @@ def experiment(
         #     project='decision-transformer',
         #     config=variant
         # )
+
+        name = f"{args.env}-{args.dataset}-{args.model_type}"
         reporter = get_reporter(name, exp_name)
         # wandb.watch(model)  # wandb has some bug
 

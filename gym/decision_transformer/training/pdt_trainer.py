@@ -75,8 +75,8 @@ class PDTTrainer(Trainer):
         # logs['training/train_loss_std'] = np.std(train_losses)
         logs['training/regress_loss_mean'] = np.mean(regress_losses)
         logs['training/regress_loss_std'] = np.std(regress_losses)
-        logs['training/recon_loss_mean'] = np.mean(recon_losses)
-        logs['training/recon_loss_std'] = np.std(recon_losses)
+        logs['training/train_loss_mean'] = np.mean(recon_losses)
+        logs['training/train_loss_std'] = np.std(recon_losses)
         logs['training/phi_norm_loss_mean'] = np.mean(phi_norm_losses)
         logs['training/phi_norm_loss_std'] = np.std(phi_norm_losses)
         print(self.w)
@@ -102,7 +102,6 @@ class PDTTrainer(Trainer):
 
         action_target = torch.clone(actions)
 
-        # TODO: 要传mask给et``
         _phi = self.en_model.forward(states, actions, timesteps, attention_mask)
         # if self.phi_norm == "hard":
         #     phi = _phi / torch.linalg.vector_norm(_phi.detach(), dim=1).unsqueeze(1)
@@ -120,7 +119,7 @@ class PDTTrainer(Trainer):
         #     / torch.linalg.vector_norm(self.w)
         #     / torch.linalg.vector_norm(phi)
         # ).mean()
-        regress_loss = self.regress_loss(pred_returns, rtg[:,-1])
+        regress_loss = self.regress_loss(pred_returns, rtg[:,-1].unsqueeze(1))
 
         phi = phi.unsqueeze(1).repeat_interleave(states.shape[1], dim=1)
         state_preds, action_preds, reward_preds = self.de_model.forward(
@@ -139,24 +138,23 @@ class PDTTrainer(Trainer):
         self.et_optimizer.zero_grad()
         self.optimizer.zero_grad()
         (
-            regress_loss
-            + recon_loss
+            recon_loss
+            + regress_loss
             # + 10 * returns_loss
             # + (phi_norm_loss if self.phi_norm == "soft" else 0)
-            + phi_norm_loss
+            # + phi_norm_loss
         ).backward()
         torch.nn.utils.clip_grad_norm_(self.en_model.parameters(), .25)
         torch.nn.utils.clip_grad_norm_(self.de_model.parameters(), .25)
         self.et_optimizer.step()
         self.optimizer.step()
 
-        # # TODO: 也要传mask给et
-        # phi = self.en_model.forward(states, actions, timesteps, attention_mask).detach()
-        # pred_returns = torch.inner(phi, self.w)
-        # regress_loss = self.regress_loss(pred_returns, rtg[:,-1])
-        # self.w_optimizer.zero_grad()
-        # regress_loss.backward()
-        # self.w_optimizer.step()
+        phi = self.en_model.forward(states, actions, timesteps, attention_mask).detach()
+        pred_returns = torch.inner(phi, self.w)
+        regress_loss = self.regress_loss(pred_returns, rtg[:,-1])
+        self.w_optimizer.zero_grad()
+        regress_loss.backward()
+        self.w_optimizer.step()
 
         with torch.no_grad():
             self.diagnostics['training/action_error'] = torch.mean((action_preds-action_target)**2).detach().cpu().item()

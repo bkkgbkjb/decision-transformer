@@ -1,3 +1,4 @@
+export CUDA_VISIBLE_DEVICES=1
 
 nohup python experiment.py --env hopper --dataset medium &>hm.log &
 

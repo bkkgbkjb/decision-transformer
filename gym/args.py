@@ -30,4 +30,3 @@ parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
 
 args = parser.parse_args()
 # assert not (args.mean_x and args.double_x)
-name = f"{args.env}-{args.dataset}-{args.model_type}"
