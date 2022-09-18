@@ -37,6 +37,9 @@ class PDTTrainer(Trainer):
         self.phi_loss = nn.MSELoss()
         self.triplet_loss = nn.TripletMarginLoss(margin=1.0, p=2)
 
+        self.total_data = 0
+        self.used_data = 0
+
     def train_iteration(self, num_steps, iter_num=0, print_logs=False):
 
         # train_losses = []
@@ -80,6 +83,7 @@ class PDTTrainer(Trainer):
         logs['training/train_loss_std'] = np.std(recon_losses)
         logs['training/phi_norm_loss_mean'] = np.mean(phi_norm_losses)
         logs['training/phi_norm_loss_std'] = np.std(phi_norm_losses)
+        logs['training/used_data_perc'] = self.used_data / self.total_data * 100
         print(self.w)
         for k in self.diagnostics:
             logs[k] = self.diagnostics[k]
@@ -100,8 +104,9 @@ class PDTTrainer(Trainer):
         action_target_2 = torch.clone(actions_2)
 
         # pre = (rtg_1[:,0,0]>rtg_2[:,0,0]).to(dtype=torch.float32)
-        lb = rtg_1[:,0,0] - rtg_2[:,0,0] > 0
-        rb = rtg_2[:,0,0] - rtg_1[:,0,0] > 0
+        margin = 0
+        lb = (rtg_1[:,0,0] - rtg_2[:,0,0]) > margin
+        rb = (rtg_2[:,0,0] - rtg_1[:,0,0]) > margin
 
         phi_1 = self.en_model.forward(states_1, actions_1, timesteps_1, attention_mask_1)
         phi_2 = self.en_model.forward(states_2, actions_2, timesteps_2, attention_mask_2)
@@ -110,16 +115,17 @@ class PDTTrainer(Trainer):
         # else:
 
         # phi = _phi
-        phi_norm_loss = self.phi_loss(
-                    torch.linalg.vector_norm(phi_1, dim=1),
-                    torch.ones(self.batch_size).to(self.device),
-                )
+        phi_norm_loss = (self.phi_loss(torch.norm(phi_1, dim=1), torch.ones(self.batch_size).to(self.device))
+                    + self.phi_loss(torch.norm(phi_2, dim=1), torch.ones(self.batch_size).to(self.device)))
+        # phi_norm_loss = torch.norm(phi_1, dim=1).sum() + torch.norm(phi_2, dim=1).sum()
 
         positive = torch.cat((phi_1[lb], phi_2[rb]), 0)
         negative = torch.cat((phi_2[lb], phi_1[rb]), 0)
         anchor = self.w.expand(positive.shape[0], -1).detach()
         pref_loss = self.triplet_loss(anchor, positive, negative)
 
+        self.total_data = self.total_data + self.batch_size
+        self.used_data = self.used_data + positive.shape[0]
 
         # pred_returns = torch.inner(phi, self.w.detach())
         # returns_loss = -(
@@ -159,10 +165,10 @@ class PDTTrainer(Trainer):
         self.optimizer.zero_grad()
         (
             recon_loss
-            + pref_loss
+            + 0.2 * pref_loss
+            + 0.1 * phi_norm_loss
             # + 10 * returns_loss
             # + (phi_norm_loss if self.phi_norm == "soft" else 0)
-            # + phi_norm_loss
         ).backward()
         torch.nn.utils.clip_grad_norm_(self.en_model.parameters(), .25)
         torch.nn.utils.clip_grad_norm_(self.de_model.parameters(), .25)

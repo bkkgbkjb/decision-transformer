@@ -347,7 +347,7 @@ def experiment(
         w.requires_grad = True
         w_optimizer = torch.optim.AdamW(
             [w],
-            lr=1e-2,
+            lr=1e-3,
             weight_decay=1e-4
         )
 
