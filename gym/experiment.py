@@ -390,6 +390,8 @@ def experiment(
             loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
             eval_fns=[eval_episodes(tar) for tar in env_targets],
             device=device,
+            pref_loss_ratio=variant.get("pref_loss_ratio", 0.1),
+            phi_norm_loss_ratio=variant.get("phi_norm_loss_ratio", 0.1)
         )
 
     if log_to_wandb:

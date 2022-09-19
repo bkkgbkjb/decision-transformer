@@ -23,6 +23,8 @@ class PDTTrainer(Trainer):
         device,
         scheduler=None,
         eval_fns=None,
+        pref_loss_ratio=0.1,
+        phi_norm_loss_ratio=0.1
     ):
         super().__init__(None, optimizer, batch_size, get_batch, loss_fn, scheduler, eval_fns)
         self.en_model = en_model
@@ -36,6 +38,9 @@ class PDTTrainer(Trainer):
         self.regress_loss = nn.MSELoss()
         self.phi_loss = nn.MSELoss()
         self.triplet_loss = nn.TripletMarginLoss(margin=1.0, p=2)
+
+        self.pref_loss_ratio = pref_loss_ratio
+        self.phi_norm_loss_ratio = phi_norm_loss_ratio
 
         self.total_data = 0
         self.used_data = 0
@@ -165,8 +170,8 @@ class PDTTrainer(Trainer):
         self.optimizer.zero_grad()
         (
             recon_loss
-            + 0.2 * pref_loss
-            + 0.1 * phi_norm_loss
+            + self.pref_loss_ratio * pref_loss
+            + self.phi_norm_loss_ratio * phi_norm_loss
             # + 10 * returns_loss
             # + (phi_norm_loss if self.phi_norm == "soft" else 0)
         ).backward()
