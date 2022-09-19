@@ -1,3 +1,4 @@
+from datetime import datetime
 import setup
 from experiment import experiment
 from ray import tune
@@ -36,6 +37,7 @@ tune.run(
     scheduler=AsyncHyperBandScheduler(
         max_t=100, grace_period=int(100 / 2)
     ),
+    name=f"ray-tune-{args.env}-{args.dataset}-{datetime.now().strftime('%m-%d:%H:%M:%S:%s')}",
     resources_per_trial={"cpu": 1 / 64, "gpu": 1 / 16},
     max_concurrent_trials=16,
     config=params,
