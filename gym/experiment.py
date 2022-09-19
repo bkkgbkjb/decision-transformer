@@ -38,7 +38,7 @@ def experiment(
         exp_prefix,
         variant,
 ):
-    exp_name = json.dumps(vars(args), indent=4, sort_keys=True)
+    exp_name = json.dumps(variant, indent=4, sort_keys=True)
     device = variant.get('device', 'cuda')
     log_to_wandb = variant.get('log_to_wandb', False)
 
