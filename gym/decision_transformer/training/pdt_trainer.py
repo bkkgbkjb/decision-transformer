@@ -105,8 +105,8 @@ class PDTTrainer(Trainer):
 
         # pre = (rtg_1[:,0,0]>rtg_2[:,0,0]).to(dtype=torch.float32)
         margin = 0
-        lb = (rtg_1[:,0,0] - rtg_2[:,0,0]) > margin
-        rb = (rtg_2[:,0,0] - rtg_1[:,0,0]) > margin
+        lb = (rtg_1[:,-1,0] - rtg_2[:,-1,0]) > margin
+        rb = (rtg_2[:,-1,0] - rtg_1[:,-1,0]) > margin
 
         phi_1 = self.en_model.forward(states_1, actions_1, timesteps_1, attention_mask_1)
         phi_2 = self.en_model.forward(states_2, actions_2, timesteps_2, attention_mask_2)
