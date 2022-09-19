@@ -39,9 +39,9 @@ tune.run(
     resources_per_trial={"cpu": 1 / 64, "gpu": 1 / 16},
     max_concurrent_trials=16,
     config=params,
-    num_samples=36,
+    num_samples=32,
     verbose=1,
-    log_to_file=True,
+    log_to_file=False,
     sync_config=tune.SyncConfig(syncer=None),
     local_dir=path.abspath("./ray"),
     callbacks=[TBXLoggerCallback()]
