@@ -36,8 +36,8 @@ tune.run(
     scheduler=AsyncHyperBandScheduler(
         max_t=100, grace_period=int(100 / 2)
     ),
-    resources_per_trial={"cpu": 1, "gpu": 1 / 16},
-    max_concurrent_trials=1,
+    resources_per_trial={"cpu": 1 / 64, "gpu": 1 / 16},
+    max_concurrent_trials=16,
     config=params,
     num_samples=36,
     verbose=1,
