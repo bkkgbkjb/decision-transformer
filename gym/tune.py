@@ -40,7 +40,7 @@ tune.run(
     ),
     name=f"ray-tune-{args.env}-{args.dataset}-{datetime.now().strftime('%m-%d:%H:%M:%S:%s')}",
     resources_per_trial={"cpu": 1 / 3, "gpu": 1 / 15},
-    max_concurrent_trials=5,
+    max_concurrent_trials=4,
     config=params,
     num_samples=15,
     verbose=1,
