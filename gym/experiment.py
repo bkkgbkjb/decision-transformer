@@ -23,6 +23,7 @@ from reporter import get_reporter
 from setup import RANDOM_SEED
 
 from d4rl.infos import REF_MIN_SCORE, REF_MAX_SCORE
+import os
 
 
 def discount_cumsum(x, gamma):
@@ -54,12 +55,12 @@ def experiment(
     elif env_name == 'halfcheetah':
         env = gym.make('HalfCheetah-v3')
         max_ep_len = 1000
-        env_targets = [12000, 6000]
+        env_targets = [12000]
         scale = 1000.
     elif env_name == 'walker2d':
         env = gym.make('Walker2d-v3')
         max_ep_len = 1000
-        env_targets = [5000, 2500]
+        env_targets = [5000]
         scale = 1000.
     elif env_name == 'reacher2d':
         from decision_transformer.envs.reacher_2d import Reacher2dEnv
@@ -78,7 +79,8 @@ def experiment(
     act_dim = env.action_space.shape[0]
 
     # load dataset
-    dataset_path = f'data/{env_name}-{dataset}-v2.pkl'
+    dir_path = variant.get('dirpath', '.')
+    dataset_path = f'{dir_path}/data/{env_name}-{dataset}-v2.pkl'
     with open(dataset_path, 'rb') as f:
         trajectories = pickle.load(f)
 
@@ -255,6 +257,9 @@ def experiment(
                 returns.append(ret)
                 norm_returns.append(norm_ret)
                 lengths.append(length)
+            if variant.get("in_tune", False):
+                from ray import tune
+                tune.report(**{"eval/return": norm_ret})
             return {
                 f'target_{target_rew}_return_mean': np.mean(returns),
                 f'target_{target_rew}_return_std': np.std(returns),
@@ -347,7 +352,7 @@ def experiment(
         w.requires_grad = True
         w_optimizer = torch.optim.AdamW(
             [w],
-            lr=1e-3,
+            lr=variant.get("w_lr", 1e-3),
             weight_decay=1e-4
         )
 
@@ -399,8 +404,15 @@ def experiment(
         reporter = get_reporter(name, exp_name)
         # wandb.watch(model)  # wandb has some bug
 
+    max_perf = -1000
     for iter in range(variant['max_iters']):
         outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True)
+        norm_return_mean = outputs[f'evaluation/target_{env_targets[0]}_norm_return_mean']
+        if iter >= 10 and norm_return_mean > max_perf and variant.get("in_tune", False):
+            if not os.path.exists("./model_weight"):
+                os.mkdir("./model_weight")
+            torch.save((en_model.state_dict(), w, model.state_dict()), f"./model_weight/params_{iter}.pt")
+            max_perf = norm_return_mean
         if log_to_wandb:
             # wandb.log(outputs)
             reporter(outputs)

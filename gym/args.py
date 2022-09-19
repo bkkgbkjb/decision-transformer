@@ -28,5 +28,5 @@ parser.add_argument('--eval-no-change', type=bool, default=True)
 parser.add_argument('--subepisode', type=bool, default=True)
 parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
 
-args = parser.parse_args()
+args, _ = parser.parse_known_args()
 # assert not (args.mean_x and args.double_x)

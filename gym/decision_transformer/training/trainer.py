@@ -27,7 +27,7 @@ class Trainer:
         train_start = time.time()
 
         self.model.train()
-        for i in tqdm(range(num_steps)):
+        for i in range(num_steps):
             train_loss = self.train_step()
             train_losses.append(train_loss)
             if self.scheduler is not None:

@@ -53,7 +53,7 @@ class PDTTrainer(Trainer):
 
         self.en_model.train()
         self.de_model.train()
-        for i in tqdm(range(num_steps)):
+        for i in range(num_steps):
             regress_loss, recon_loss, phi_norm_loss = self.train_step()
             regress_losses.append(regress_loss)
             recon_losses.append(recon_loss)
