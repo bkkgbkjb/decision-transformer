@@ -8,6 +8,7 @@ from ray.tune.suggest.optuna import OptunaSearch
 from os import path
 from ray.tune.logger import TBXLoggerCallback
 import numpy as np
+import math
 
 
 def trail(params):
@@ -15,7 +16,7 @@ def trail(params):
     import d4rl
     
     from ray.tune.utils import wait_for_gpu
-    wait_for_gpu(target_util= 1 - 1/16)
+    wait_for_gpu(target_util= 1 - 1/15)
 
     experiment("gym-experiment-tune", {**vars(args), **params})
 
@@ -35,13 +36,13 @@ tune.run(
     mode="max",
     search_alg=OptunaSearch(),
     scheduler=AsyncHyperBandScheduler(
-        max_t=100, grace_period=int(100 / 2)
+        max_t=100, grace_period=math.floor(100 / 3)
     ),
     name=f"ray-tune-{args.env}-{args.dataset}-{datetime.now().strftime('%m-%d:%H:%M:%S:%s')}",
-    resources_per_trial={"cpu": 1 / 64, "gpu": 1 / 16},
-    max_concurrent_trials=16,
+    resources_per_trial={"cpu": 1 / 3, "gpu": 1 / 15},
+    max_concurrent_trials=5,
     config=params,
-    num_samples=32,
+    num_samples=15,
     verbose=1,
     log_to_file=False,
     sync_config=tune.SyncConfig(syncer=None),
