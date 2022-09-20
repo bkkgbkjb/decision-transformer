@@ -1,5 +1,6 @@
-from datetime import datetime
 import setup
+from setup import seed
+from datetime import datetime
 from experiment import experiment
 from ray import tune
 from args import args
@@ -10,6 +11,7 @@ from ray.tune.logger import TBXLoggerCallback
 import numpy as np
 import math
 
+seed(args.seed)
 
 def trail(params):
     import setup

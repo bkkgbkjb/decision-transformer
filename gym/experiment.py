@@ -1,4 +1,5 @@
 import setup
+from setup import seed
 import gym
 import numpy as np
 import torch
@@ -38,6 +39,7 @@ def experiment(
         exp_prefix,
         variant,
 ):
+    seed(variant['seed'])
     exp_name = json.dumps(variant, indent=4, sort_keys=True)
     device = variant.get('device', 'cuda')
     log_to_wandb = variant.get('log_to_wandb', False)
@@ -114,12 +116,12 @@ def experiment(
     num_eval_episodes = variant['num_eval_episodes']
     pct_traj = variant.get('pct_traj', 1.)
 
-    z_dim = args.z_dim
+    z_dim = variant['z_dim']
     print(f'z_dim is: {z_dim}')
-    print(f"reward foresee is: {args.foresee}")
+    print(f"reward foresee is: {variant['foresee']}")
 
-    expert_score = REF_MAX_SCORE[f"{args.env}-{args.dataset}-v2"]
-    random_score = REF_MIN_SCORE[f"{args.env}-{args.dataset}-v2"]
+    expert_score = REF_MAX_SCORE[f"{variant['env']}-{variant['dataset']}-v2"]
+    random_score = REF_MIN_SCORE[f"{variant['env']}-{variant['dataset']}-v2"]
     print(f"max score is: {expert_score}, min score is {random_score}")
 
     # only train on top pct_traj trajectories (for %BC experiment)
@@ -167,11 +169,11 @@ def experiment(
             assert not (timesteps[-1] >= max_ep_len).any()
             timesteps[-1][timesteps[-1] >= max_ep_len] = max_ep_len-1  # padding cutoff
 
-            if args.train_no_change:
-                if not args.subepisode:
+            if variant['train_no_change']:
+                if not variant['subepisode']:
                     rtg.append(discount_cumsum(traj['rewards'][0:], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
                 else:
-                    rtg.append(discount_cumsum(traj['rewards'][si:si+args.foresee], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
+                    rtg.append(discount_cumsum(traj['rewards'][si:si+variant['foresee']], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
                     # rtg.append((np.sum(traj['rewards'][si:si + s[-1].shape[1]])).reshape(1,1,1).repeat(s[-1].shape[1] + 1, axis=1))
 
             else:
@@ -219,11 +221,12 @@ def experiment(
                             model,
                             max_ep_len=max_ep_len,
                             scale=scale,
-                            target_return=target_rew/scale if not args.subepisode else target_rew / scale,
+                            target_return=target_rew/scale if not variant['subepisode'] else target_rew / scale,
                             mode=mode,
                             state_mean=state_mean,
                             state_std=state_std,
                             device=device,
+                            eval_no_change=variant['eval_no_change']
                         )
                     elif model_type == 'pdt':
                         ret, length = evaluate_episode_phi(
@@ -402,7 +405,7 @@ def experiment(
         #     config=variant
         # )
 
-        name = f"{args.env}-{args.dataset}-{args.model_type}"
+        name = f"{variant['env']}-{variant['dataset']}-{variant['model_type']}"
         reporter = get_reporter(name, exp_name)
         # wandb.watch(model)  # wandb has some bug
 
