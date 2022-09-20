@@ -409,15 +409,17 @@ def experiment(
         reporter = get_reporter(name, exp_name)
         # wandb.watch(model)  # wandb has some bug
 
-    max_perf = -1000
+    max_perf = -1e7
+    last_saved_idx = -1
     for iter in range(variant['max_iters']):
         outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True)
         norm_return_mean = outputs[f'evaluation/target_{env_targets[0]}_norm_return_mean']
-        if iter >= 10 and norm_return_mean > max_perf and variant.get("in_tune", False):
+        if variant.get("in_tune", False) and iter >= 10 and (norm_return_mean > max_perf or (iter - last_saved_idx > 20)):
             if not os.path.exists("./model_weight"):
                 os.mkdir("./model_weight")
             torch.save((en_model.state_dict(), w, model.state_dict()), f"./model_weight/params_{iter}.pt")
             max_perf = norm_return_mean
+            last_saved_idx = iter
         if log_to_wandb:
             # wandb.log(outputs)
             reporter(outputs)
