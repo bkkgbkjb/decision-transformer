@@ -8,6 +8,7 @@ from ray.tune.schedulers import AsyncHyperBandScheduler
 from ray.tune.suggest.optuna import OptunaSearch
 from os import path
 from ray.tune.logger import TBXLoggerCallback
+from ray.tune.progress_reporter import CLIReporter
 import numpy as np
 import math
 
@@ -46,7 +47,7 @@ tune.run(
     config=params,
     num_samples=12,
     verbose=1,
-    log_to_file=False,
+    progress_reporter=CLIReporter(max_report_frequency=300),
     sync_config=tune.SyncConfig(syncer=None),
     local_dir=path.abspath("./ray"),
     callbacks=[TBXLoggerCallback()]
