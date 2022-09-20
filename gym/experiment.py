@@ -21,7 +21,6 @@ from decision_transformer.training.act_trainer import ActTrainer
 from decision_transformer.training.seq_trainer import SequenceTrainer
 from decision_transformer.training.pdt_trainer import PDTTrainer
 from reporter import get_reporter
-from setup import RANDOM_SEED
 
 from d4rl.infos import REF_MIN_SCORE, REF_MAX_SCORE
 import os
@@ -72,7 +71,7 @@ def experiment(
         scale = 10.
     else:
         raise NotImplementedError
-    env.seed(RANDOM_SEED)
+    env.seed(variant['seed'])
 
     if model_type == 'bc':
         env_targets = env_targets[:1]  # since BC ignores target, no need for different evaluations
@@ -209,7 +208,9 @@ def experiment(
         return s, a, r, d, rtg, timesteps, mask
 
     def eval_episodes(target_rew):
+        largest_norm_return_mean = -1e7
         def fn(model):
+            nonlocal largest_norm_return_mean
             returns, norm_returns, lengths = [], [], []
             for _ in range(num_eval_episodes):
                 with torch.no_grad():
@@ -262,7 +263,12 @@ def experiment(
                 lengths.append(length)
             if variant.get("in_tune", False):
                 from ray import tune
-                tune.report(**{"eval/return": norm_ret})
+                # tune.report(**{"eval/return": np.mean(norm_returns)})
+                mean_norm_return = np.mean(norm_returns)
+                if mean_norm_return > largest_norm_return_mean:
+                    largest_norm_return_mean = mean_norm_return
+                tune.report(**{"eval/return": largest_norm_return_mean})
+
             return {
                 f'target_{target_rew}_return_mean': np.mean(returns),
                 f'target_{target_rew}_return_std': np.std(returns),

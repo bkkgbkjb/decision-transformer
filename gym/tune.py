@@ -44,7 +44,7 @@ tune.run(
     resources_per_trial={"cpu": 1 / 3, "gpu": 1 / 15},
     max_concurrent_trials=4,
     config=params,
-    num_samples=15,
+    num_samples=12,
     verbose=1,
     log_to_file=False,
     sync_config=tune.SyncConfig(syncer=None),
