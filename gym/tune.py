@@ -38,9 +38,9 @@ tune.run(
     metric="eval/return",
     mode="max",
     search_alg=OptunaSearch(),
-    scheduler=AsyncHyperBandScheduler(
-        max_t=100, grace_period=math.floor(100 / 3)
-    ),
+    # scheduler=AsyncHyperBandScheduler(
+    #     max_t=100, grace_period=math.floor(100 / 3)
+    # ),
     name=f"ray-tune-{args.env}-{args.dataset}-{datetime.now().strftime('%m-%d:%H:%M:%S:%s')}",
     resources_per_trial={"cpu": 1 / 3, "gpu": 1 / 15},
     max_concurrent_trials=4,

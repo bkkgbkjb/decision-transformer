@@ -361,7 +361,7 @@ def experiment(
         w.requires_grad = True
         w_optimizer = torch.optim.AdamW(
             [w],
-            lr=variant.get("w_lr", 1e-3),
+            lr=variant["w_lr"],
             weight_decay=1e-4
         )
 
@@ -399,8 +399,8 @@ def experiment(
             loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
             eval_fns=[eval_episodes(tar) for tar in env_targets],
             device=device,
-            pref_loss_ratio=variant.get("pref_loss_ratio", 0.1),
-            phi_norm_loss_ratio=variant.get("phi_norm_loss_ratio", 0.1)
+            pref_loss_ratio=variant["pref_loss_ratio"],
+            phi_norm_loss_ratio=variant["phi_norm_loss_ratio"]
         )
 
     if log_to_wandb:
