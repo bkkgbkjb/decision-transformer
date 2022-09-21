@@ -1,3 +1,4 @@
+from datetime import datetime
 import setup
 from setup import seed
 import gym
@@ -411,7 +412,7 @@ def experiment(
         #     config=variant
         # )
 
-        name = f"{variant['env']}-{variant['dataset']}-{variant['model_type']}"
+        name = f"{variant['env']}-{variant['dataset']}-{variant['model_type']}-{datetime.now().strftime('%s')}"
         reporter = get_reporter(name, exp_name)
         # wandb.watch(model)  # wandb has some bug
 
