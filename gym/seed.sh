@@ -34,9 +34,9 @@ nohup python experiment.py --env halfcheetah --dataset medium --seed 0 &>cm0.log
 nohup python experiment.py --env halfcheetah --dataset medium --seed 100 &>cm100.log &
 nohup python experiment.py --env halfcheetah --dataset medium --seed 200 &>cm200.log &
 
-nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 0 &>cme0.log &
-nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 100 &>cme100.log &
-nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 200 &>cme200.log &
+nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 0 --phi_norm_loss_ratio 0.05 --pref_loss_ratio 0.25 --w_lr 0.01 &>cme0.log &
+nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 100 --phi_norm_loss_ratio 0.05 --pref_loss_ratio 0.25 --w_lr 0.01 &>cme100.log &
+nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 200 --phi_norm_loss_ratio 0.05 --pref_loss_ratio 0.25 --w_lr 0.01 &>cme200.log &
 
 nohup python experiment.py --env halfcheetah --dataset medium-replay --seed 0 &>cmr0.log &
 nohup python experiment.py --env halfcheetah --dataset medium-replay --seed 100 &>cmr100.log &
