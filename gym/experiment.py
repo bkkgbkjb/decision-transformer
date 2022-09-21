@@ -404,6 +404,7 @@ def experiment(
             phi_norm_loss_ratio=variant["phi_norm_loss_ratio"]
         )
 
+    name = f"{variant['env']}-{variant['dataset']}-{variant['model_type']}-{variant['seed']}-{datetime.now().strftime('%f')}"
     if log_to_wandb:
         # wandb.init(
         #     name=exp_prefix,
@@ -412,7 +413,6 @@ def experiment(
         #     config=variant
         # )
 
-        name = f"{variant['env']}-{variant['dataset']}-{variant['model_type']}-{datetime.now().strftime('%s')}"
         reporter = get_reporter(name, exp_name)
         # wandb.watch(model)  # wandb has some bug
 
@@ -421,10 +421,11 @@ def experiment(
     for iter in range(variant['max_iters']):
         outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True)
         norm_return_mean = outputs[f'evaluation/target_{env_targets[0]}_norm_return_mean']
-        if variant.get("in_tune", False) and iter >= 10 and (norm_return_mean > max_perf or (iter - last_saved_idx > 20)):
-            if not os.path.exists("./model_weight"):
-                os.mkdir("./model_weight")
-            torch.save((en_model.state_dict(), w, model.state_dict()), f"./model_weight/params_{iter}.pt")
+        if (variant['force_save_model'] or variant.get("in_tune", False)) and iter >= 10 and (norm_return_mean > max_perf or (iter - last_saved_idx > 20)):
+            folder = f"./model_weight_{name}"
+            if not os.path.exists(folder):
+                os.mkdir(folder)
+            torch.save((en_model.state_dict(), w, model.state_dict()), f"./{folder}/params_{iter}.pt")
             max_perf = norm_return_mean
             last_saved_idx = iter
         if log_to_wandb:
