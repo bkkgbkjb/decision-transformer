@@ -456,7 +456,7 @@ def experiment(
         if variant.get("in_tune", False) and iter >= 10 and (norm_return_mean > max_perf or (iter - last_saved_idx > 20)):
             if not os.path.exists("./model_weight"):
                 os.mkdir("./model_weight")
-            torch.save((en_model.state_dict(), w, model.state_dict()), f"./model_weight/params_{iter}.pt")
+            torch.save((en_model.state_dict(), w, model.state_dict(), reward_model.state_dict()), f"./model_weight/params_{iter}.pt")
             max_perf = norm_return_mean
             last_saved_idx = iter
         if log_to_wandb:
