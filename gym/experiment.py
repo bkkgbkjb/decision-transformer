@@ -16,10 +16,12 @@ from decision_transformer.evaluation.evaluate_episodes import evaluate_episode, 
 from decision_transformer.models.decision_transformer import DecisionTransformer
 from decision_transformer.models.encoder_transformer import EncoderTransformer
 from decision_transformer.models.preference_decision_transformer import PreferenceDecisionTransformer
+from decision_transformer.models.reward_model import RewardModel
 from decision_transformer.models.mlp_bc import MLPBCModel
 from decision_transformer.training.act_trainer import ActTrainer
 from decision_transformer.training.seq_trainer import SequenceTrainer
 from decision_transformer.training.pdt_trainer import PDTTrainer
+from decision_transformer.training.dtpr_trainer import DTprTrainer
 from reporter import get_reporter
 
 from d4rl.infos import REF_MIN_SCORE, REF_MAX_SCORE
@@ -139,7 +141,7 @@ def experiment(
     # TODO: 这里好像有问题，并不是在根据timesteps做sample
     p_sample = traj_lens[sorted_inds] / sum(traj_lens[sorted_inds])
 
-    def get_batch(batch_size=256, max_len=K):
+    def get_batch(batch_size=256, max_len=K, reward_model=None, rew_tra=False):
         batch_inds = np.random.choice(
             np.arange(num_trajectories),
             size=batch_size,
@@ -176,11 +178,19 @@ def experiment(
                     # rtg.append((np.sum(traj['rewards'][si:si + s[-1].shape[1]])).reshape(1,1,1).repeat(s[-1].shape[1] + 1, axis=1))
 
             else:
-                rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
+                if rew_tra:
+                    rtg.append(discount_cumsum(traj['rewards'][si:si+K], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
+                elif reward_model != None:
+                    s_temp = torch.from_numpy(traj['observations'][si:]).to(device=device)
+                    a_temp = torch.from_numpy(traj['actions'][si:]).to(device=device)
+                    r_temp = reward_model(s_temp, a_temp).detach().cpu().numpy()
+                    rtg.append(discount_cumsum(r_temp, gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
+                else:
+                    rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
             # print(f"rtg is: {rtg[-1]}")
 
             if rtg[-1].shape[1] <= s[-1].shape[1]:
-                assert False
+                # assert False
                 rtg[-1] = np.concatenate([rtg[-1], np.zeros((1, 1, 1))], axis=1)
 
             # padding and state + reward normalization
@@ -214,7 +224,7 @@ def experiment(
             returns, norm_returns, lengths = [], [], []
             for _ in range(num_eval_episodes):
                 with torch.no_grad():
-                    if model_type == 'dt':
+                    if model_type in ['dt','dtpr']:
                         ret, length = evaluate_episode_rtg(
                             env,
                             state_dim,
@@ -279,7 +289,7 @@ def experiment(
             }
         return fn
 
-    if model_type == 'dt':
+    if model_type in ['dt','dtpr']:
         model = DecisionTransformer(
             state_dim=state_dim,
             act_dim=act_dim,
@@ -365,6 +375,17 @@ def experiment(
             weight_decay=1e-4
         )
 
+    if model_type == 'dtpr':
+        reward_model = RewardModel(
+            state_dim=state_dim,
+            act_dim=act_dim,
+            device=device,
+        )
+        reward_optimizer = torch.optim.AdamW(
+            reward_model.parameters(),
+            lr=3e-4,
+        )
+
     if model_type == 'dt':
         trainer = SequenceTrainer(
             model=model,
@@ -401,6 +422,18 @@ def experiment(
             device=device,
             pref_loss_ratio=variant["pref_loss_ratio"],
             phi_norm_loss_ratio=variant["phi_norm_loss_ratio"]
+        )
+    elif model_type == 'dtpr':
+        trainer = DTprTrainer(
+            model=model,
+            optimizer=optimizer,
+            reward_model=reward_model,
+            reward_optimizer=reward_optimizer,
+            batch_size=batch_size,
+            get_batch=get_batch,
+            scheduler=scheduler,
+            loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
+            eval_fns=[eval_episodes(tar) for tar in env_targets],
         )
 
     if log_to_wandb:
