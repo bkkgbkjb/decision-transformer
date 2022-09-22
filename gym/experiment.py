@@ -458,7 +458,7 @@ def experiment(
             folder = f"./model_weight_{name}"
             if not os.path.exists(folder):
                 os.mkdir(folder)
-            torch.save((en_model.state_dict(), w, model.state_dict(), reward_model.state_dict()), f"./{folder}/params_{iter}.pt")
+            torch.save((model.state_dict(), reward_model.state_dict()), f"./{folder}/params_{iter}.pt")
             max_perf = norm_return_mean
             last_saved_idx = iter
         if log_to_wandb:
