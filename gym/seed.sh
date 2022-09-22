@@ -55,11 +55,11 @@ sleep 2
 nohup python experiment.py --env halfcheetah --dataset medium --seed 200 &>cm200.log &
 sleep 2
 
-nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 0 --phi_norm_loss_ratio 0.05 --pref_loss_ratio 0.25 --w_lr 0.01 --force-save-model True &>cme0.log &
+nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 0 --force-save-model True &>cme0.log &
 sleep 2
-nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 100 --phi_norm_loss_ratio 0.05 --pref_loss_ratio 0.25 --w_lr 0.01 &>cme100.log &
+nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 100 &>cme100.log &
 sleep 2
-nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 200 --phi_norm_loss_ratio 0.05 --pref_loss_ratio 0.25 --w_lr 0.01 &>cme200.log &
+nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 200 &>cme200.log &
 sleep 2
 
 nohup python experiment.py --env halfcheetah --dataset medium-replay --seed 0 --force-save-model True &>cmr0.log &

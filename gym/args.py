@@ -30,6 +30,7 @@ parser.add_argument('--log_to_wandb', '-w', type=bool, default=True)
 parser.add_argument('--phi_norm_loss_ratio', type=float, default=0.1)
 parser.add_argument('--pref_loss_ratio', type=float, default=0.1)
 parser.add_argument('--w_lr', type=float, default=0.1)
+parser.add_argument('--force-save-model', type=bool, default=False)
 
 args, _ = parser.parse_known_args()
 # assert not (args.mean_x and args.double_x)
