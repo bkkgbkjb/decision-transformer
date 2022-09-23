@@ -5,4 +5,3 @@ runs*
 gym/data/*.pkl
 *.log
 ray
-gym/tsne/model_weight/
