@@ -127,7 +127,7 @@ class PDTTrainer(Trainer):
         positive = torch.cat((phi_1[lb], phi_2[rb]), 0)
         negative = torch.cat((phi_2[lb], phi_1[rb]), 0)
         anchor = self.w.expand(positive.shape[0], -1).detach()
-        pref_loss = self.triplet_loss(anchor, positive, negative)
+        # pref_loss = self.triplet_loss(anchor, positive, negative)
 
         self.total_data = self.total_data + self.batch_size
         self.used_data = self.used_data + positive.shape[0]
@@ -170,7 +170,7 @@ class PDTTrainer(Trainer):
         self.optimizer.zero_grad()
         (
             recon_loss
-            + self.pref_loss_ratio * pref_loss
+            # + self.pref_loss_ratio * pref_loss
             + self.phi_norm_loss_ratio * phi_norm_loss
             # + 10 * returns_loss
             # + (phi_norm_loss if self.phi_norm == "soft" else 0)
