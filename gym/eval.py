@@ -138,83 +138,6 @@ def experiment(
     # used to reweight sampling so we sample according to timesteps instead of trajectories
     # TODO: 这里好像有问题，并不是在根据timesteps做sample
     p_sample = traj_lens[sorted_inds] / sum(traj_lens[sorted_inds])
-
-    sub_trajectories = []
-
-    SAMPLE_RATIO = 1 / 10
-    def fill_batch(sub_trajectories, batch_size=256, max_len=K):
-        while len(sub_trajectories) <= ((1e6 / K) * SAMPLE_RATIO):
-            batch_inds = np.random.choice(
-                np.arange(num_trajectories),
-                size=batch_size,
-                replace=True,
-                p=p_sample,  # reweights so we sample according to timesteps
-            )
-
-            s, a, r, d, rtg, timesteps, mask = [], [], [], [], [], [], []
-            for i in range(batch_size):
-                # TODO: 这里好像是优先级sample
-                traj = trajectories[int(sorted_inds[batch_inds[i]])]
-                si = random.randint(0, traj['rewards'].shape[0] - 1)
-
-                # get sequences from dataset
-
-                # reshape是在unsqueeze(0)
-                # 如果si取到很后面的，si + max_len 就会超界，此时tlen < max_len
-                s.append(traj['observations'][si:si + max_len].reshape(1, -1, state_dim))
-                a.append(traj['actions'][si:si + max_len].reshape(1, -1, act_dim))
-                r.append(traj['rewards'][si:si + max_len].reshape(1, -1, 1))
-                if 'terminals' in traj:
-                    d.append(traj['terminals'][si:si + max_len].reshape(1, -1))
-                else:
-                    d.append(traj['dones'][si:si + max_len].reshape(1, -1))
-                timesteps.append(np.arange(si, si + s[-1].shape[1]).reshape(1, -1))
-                assert not (timesteps[-1] >= max_ep_len).any()
-                timesteps[-1][timesteps[-1] >= max_ep_len] = max_ep_len-1  # padding cutoff
-
-                if variant['train_no_change']:
-                    if not variant['subepisode']:
-                        rtg.append(discount_cumsum(traj['rewards'][0:], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
-                    else:
-                        rtg.append(discount_cumsum(traj['rewards'][si:si+variant['foresee']], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
-                        # rtg.append((np.sum(traj['rewards'][si:si + s[-1].shape[1]])).reshape(1,1,1).repeat(s[-1].shape[1] + 1, axis=1))
-
-                else:
-                    rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
-                # print(f"rtg is: {rtg[-1]}")
-
-                if rtg[-1].shape[1] <= s[-1].shape[1]:
-                    assert False
-                    rtg[-1] = np.concatenate([rtg[-1], np.zeros((1, 1, 1))], axis=1)
-
-                # padding and state + reward normalization
-
-                # TODO: 为什么在前面padding
-                tlen = s[-1].shape[1]
-                s[-1] = np.concatenate([np.zeros((1, max_len - tlen, state_dim)), s[-1]], axis=1)
-                s[-1] = (s[-1] - state_mean) / state_std
-                a[-1] = np.concatenate([np.ones((1, max_len - tlen, act_dim)) * -10., a[-1]], axis=1)
-                r[-1] = np.concatenate([np.zeros((1, max_len - tlen, 1)), r[-1]], axis=1)
-                # TODO: 为什么要乘2
-                d[-1] = np.concatenate([np.ones((1, max_len - tlen)) * 2, d[-1]], axis=1)
-                rtg[-1] = np.concatenate([np.zeros((1, max_len - tlen, 1)), rtg[-1]], axis=1) / scale
-                timesteps[-1] = np.concatenate([np.zeros((1, max_len - tlen)), timesteps[-1]], axis=1)
-                mask.append(np.concatenate([np.zeros((1, max_len - tlen)), np.ones((1, tlen))], axis=1))
-                sub_trajectories.append((s[-1].squeeze(0),a[-1].squeeze(0),rtg[-1][0, -1, 0], timesteps[-1].squeeze(0).astype(int), mask[-1].squeeze(0).astype(int)))
-
-            # s = torch.from_numpy(np.concatenate(s, axis=0)).to(dtype=torch.float32, device=device)
-            # a = torch.from_numpy(np.concatenate(a, axis=0)).to(dtype=torch.float32, device=device)
-            # r = torch.from_numpy(np.concatenate(r, axis=0)).to(dtype=torch.float32, device=device)
-            # d = torch.from_numpy(np.concatenate(d, axis=0)).to(dtype=torch.long, device=device)
-            # rtg = torch.from_numpy(np.concatenate(rtg, axis=0)).to(dtype=torch.float32, device=device)
-            # timesteps = torch.from_numpy(np.concatenate(timesteps, axis=0)).to(dtype=torch.long, device=device)
-            # mask = torch.from_numpy(np.concatenate(mask, axis=0)).to(device=device)
-            
-    fill_batch(sub_trajectories, max_len=variant['K'])
-    print(f"get total {len(sub_trajectories)} sub_trajectories")
-
-    sub_trajectories.sort(key=lambda se: se[2])
-
     def eval_episodes(target_rew):
         largest_norm_return_mean = -1e7
         def fn(model):
@@ -258,6 +181,9 @@ def experiment(
             }
         return fn
 
+
+    name = f"{variant['eval_kind']}-{variant['env']}-{variant['dataset']}-{variant['model_type']}"
+    reporter = get_reporter(name, exp_name)
     model = PreferenceDecisionTransformer(
         state_dim=state_dim,
         act_dim=act_dim,
@@ -296,8 +222,6 @@ def experiment(
     w = (torch.randn(z_dim) * 2).to(device=device)
     w.requires_grad = True
 
-    name = f"{variant['eval_kind']}-{variant['env']}-{variant['dataset']}-{variant['model_type']}"
-    reporter = get_reporter(name, exp_name)
 
     MODEL_WEIGHT = f"./tsne/model_weight/{variant['env']}_{variant['dataset']}.pt"
     (en_model_p, bw, dt_model) = torch.load(MODEL_WEIGHT)
@@ -305,44 +229,122 @@ def experiment(
     model.load_state_dict(dt_model)
     en_model.load_state_dict(en_model_p)
     en_model.eval()
-
-    (gs, ga, gr, gt, gm) = sub_trajectories[-1]
-    (bs, ba, br, bt, bm) = sub_trajectories[0]
-    good_phi = en_model.forward(torch.from_numpy(gs).float().to(device).unsqueeze(0), torch.from_numpy(ga).float().to(device).unsqueeze(0), torch.from_numpy(gt).long().to(device), torch.from_numpy(gm).long().to(device).unsqueeze(0))
-
-    bad_phi = en_model.forward(torch.from_numpy(bs).float().to(device).unsqueeze(0), torch.from_numpy(ba).float().to(device).unsqueeze(0), torch.from_numpy(bt).long().to(device), torch.from_numpy(bm).long().to(device).unsqueeze(0))
-
-    w = bw
-    w.requires_grad = False
-
-    rw = w[torch.randperm(w.shape[0])]
-
-    kind = variant['eval_kind']
-    assert kind in ['w', 'rw', 'good_phi', 'bad_phi']
-    if kind == 'w':
-        used = w
-    elif kind == 'rw':
-        used = rw
-    elif kind == 'good_phi':
-        used = good_phi
-    elif kind == 'bad_phi':
-        used = bad_phi
-    else:
-        raise ValueError()
-
     norm_returns = []
-    for _ in range(variant['max_iters']):
-        for eval_fn in [eval_episodes(rew) for rew in env_targets]:
-            outputs = eval_fn((model, used))
-            norm_return = outputs[f'target_{env_targets[0]}_norm_return_mean']
-            norm_returns.append(norm_return)
-        if log_to_wandb:
-            # wandb.log(outputs)
-            reporter(outputs)
-    assert len(norm_returns) == variant['max_iters']
+    for _ in range(10):
+        sub_trajectories = []
+
+        SAMPLE_RATIO = 1 / 10
+        def fill_batch(sub_trajectories, batch_size=256, max_len=K):
+            while len(sub_trajectories) <= ((1e6 / K) * SAMPLE_RATIO):
+                batch_inds = np.random.choice(
+                    np.arange(num_trajectories),
+                    size=batch_size,
+                    replace=True,
+                    p=p_sample,  # reweights so we sample according to timesteps
+                )
+
+                s, a, r, d, rtg, timesteps, mask = [], [], [], [], [], [], []
+                for i in range(batch_size):
+                    # TODO: 这里好像是优先级sample
+                    traj = trajectories[int(sorted_inds[batch_inds[i]])]
+                    si = random.randint(0, traj['rewards'].shape[0] - 1)
+
+                    # get sequences from dataset
+
+                    # reshape是在unsqueeze(0)
+                    # 如果si取到很后面的，si + max_len 就会超界，此时tlen < max_len
+                    s.append(traj['observations'][si:si + max_len].reshape(1, -1, state_dim))
+                    a.append(traj['actions'][si:si + max_len].reshape(1, -1, act_dim))
+                    r.append(traj['rewards'][si:si + max_len].reshape(1, -1, 1))
+                    if 'terminals' in traj:
+                        d.append(traj['terminals'][si:si + max_len].reshape(1, -1))
+                    else:
+                        d.append(traj['dones'][si:si + max_len].reshape(1, -1))
+                    timesteps.append(np.arange(si, si + s[-1].shape[1]).reshape(1, -1))
+                    assert not (timesteps[-1] >= max_ep_len).any()
+                    timesteps[-1][timesteps[-1] >= max_ep_len] = max_ep_len-1  # padding cutoff
+
+                    if variant['train_no_change']:
+                        if not variant['subepisode']:
+                            rtg.append(discount_cumsum(traj['rewards'][0:], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
+                        else:
+                            rtg.append(discount_cumsum(traj['rewards'][si:si+variant['foresee']], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
+                            # rtg.append((np.sum(traj['rewards'][si:si + s[-1].shape[1]])).reshape(1,1,1).repeat(s[-1].shape[1] + 1, axis=1))
+
+                    else:
+                        rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
+                    # print(f"rtg is: {rtg[-1]}")
+
+                    if rtg[-1].shape[1] <= s[-1].shape[1]:
+                        assert False
+                        rtg[-1] = np.concatenate([rtg[-1], np.zeros((1, 1, 1))], axis=1)
+
+                    # padding and state + reward normalization
+
+                    # TODO: 为什么在前面padding
+                    tlen = s[-1].shape[1]
+                    s[-1] = np.concatenate([np.zeros((1, max_len - tlen, state_dim)), s[-1]], axis=1)
+                    s[-1] = (s[-1] - state_mean) / state_std
+                    a[-1] = np.concatenate([np.ones((1, max_len - tlen, act_dim)) * -10., a[-1]], axis=1)
+                    r[-1] = np.concatenate([np.zeros((1, max_len - tlen, 1)), r[-1]], axis=1)
+                    # TODO: 为什么要乘2
+                    d[-1] = np.concatenate([np.ones((1, max_len - tlen)) * 2, d[-1]], axis=1)
+                    rtg[-1] = np.concatenate([np.zeros((1, max_len - tlen, 1)), rtg[-1]], axis=1) / scale
+                    timesteps[-1] = np.concatenate([np.zeros((1, max_len - tlen)), timesteps[-1]], axis=1)
+                    mask.append(np.concatenate([np.zeros((1, max_len - tlen)), np.ones((1, tlen))], axis=1))
+                    sub_trajectories.append((s[-1].squeeze(0),a[-1].squeeze(0),rtg[-1][0, -1, 0], timesteps[-1].squeeze(0).astype(int), mask[-1].squeeze(0).astype(int)))
+
+                # s = torch.from_numpy(np.concatenate(s, axis=0)).to(dtype=torch.float32, device=device)
+                # a = torch.from_numpy(np.concatenate(a, axis=0)).to(dtype=torch.float32, device=device)
+                # r = torch.from_numpy(np.concatenate(r, axis=0)).to(dtype=torch.float32, device=device)
+                # d = torch.from_numpy(np.concatenate(d, axis=0)).to(dtype=torch.long, device=device)
+                # rtg = torch.from_numpy(np.concatenate(rtg, axis=0)).to(dtype=torch.float32, device=device)
+                # timesteps = torch.from_numpy(np.concatenate(timesteps, axis=0)).to(dtype=torch.long, device=device)
+                # mask = torch.from_numpy(np.concatenate(mask, axis=0)).to(device=device)
+                
+        fill_batch(sub_trajectories, max_len=variant['K'])
+        print(f"get total {len(sub_trajectories)} sub_trajectories")
+
+        sub_trajectories.sort(key=lambda se: se[2])
+
+
+        (gs, ga, gr, gt, gm) = sub_trajectories[-1]
+        (bs, ba, br, bt, bm) = sub_trajectories[0]
+        good_phi = en_model.forward(torch.from_numpy(gs).float().to(device).unsqueeze(0), torch.from_numpy(ga).float().to(device).unsqueeze(0), torch.from_numpy(gt).long().to(device), torch.from_numpy(gm).long().to(device).unsqueeze(0))
+
+        bad_phi = en_model.forward(torch.from_numpy(bs).float().to(device).unsqueeze(0), torch.from_numpy(ba).float().to(device).unsqueeze(0), torch.from_numpy(bt).long().to(device), torch.from_numpy(bm).long().to(device).unsqueeze(0))
+
+        w = bw
+        w.requires_grad = False
+
+        rw = w[torch.randperm(w.shape[0])]
+
+        kind = variant['eval_kind']
+        assert kind in ['w', 'rw', 'good_phi', 'bad_phi']
+        if kind == 'w':
+            used = w
+        elif kind == 'rw':
+            used = rw
+        elif kind == 'good_phi':
+            used = good_phi
+        elif kind == 'bad_phi':
+            used = bad_phi
+        else:
+            raise ValueError()
+
+        for _ in range(variant['max_iters']):
+            for eval_fn in [eval_episodes(rew) for rew in env_targets]:
+                outputs = eval_fn((model, used))
+                norm_return = outputs[f'target_{env_targets[0]}_norm_return_mean']
+                norm_returns.append(norm_return)
+            if log_to_wandb:
+                # wandb.log(outputs)
+                reporter(outputs)
+
+    assert len(norm_returns) == variant['max_iters'] * 10
     reporter(dict(norm_return_all_mean=np.mean(norm_returns), norm_return_all_std=np.std(norm_returns)))
 
-    print(f"norm_return_all_mean: {np.mean(norm_returns)}, norm_return_all_std: {np.std(norm_returns)}")
+    print(f"{variant['env']}-{variant['dataset']}: norm_return_all_mean: {np.mean(norm_returns)}, norm_return_all_std: {np.std(norm_returns)}")
 
 
 if __name__ == '__main__':
