@@ -29,7 +29,8 @@ class CQLTrainer(Trainer):
         self.a_tensor = torch.from_numpy(self.dataset['actions']).float().to(device)
     
     def train_rewarder(self, num_iters = int(5e4), reporter = None):
-        for _ in tqdm(range(num_iters)):
+        for _ in range(num_iters):
+            # Review: 这里没来得及看，可能需要仔细对下看和PbDT是否一致
             states_1, actions_1, rewards_1, dones_1, rtg_1, timesteps_1, attention_mask_1 = self.get_batch(self.batch_size, rew_tra = True)
             states_2, actions_2, rewards_2, dones_2, rtg_2, timesteps_2, attention_mask_2 = self.get_batch(self.batch_size, rew_tra = True)
             rtg_hat_1 = self.reward_model(states_1, actions_1)
@@ -57,8 +58,11 @@ class CQLTrainer(Trainer):
     def relabel(self):
 
         rewards = np.empty((self.o_tensor.size(0), ))
+
+        # 是为了切分再在gpu上预测，不然可能cuda oom
+        # Review: 可能需要仔细看下
         for i in range(math.ceil(self.o_tensor.size(0) / 100)):
-            rewards[i:(i+100)] = self.reward_model(self.o_tensor[i:(i+100)], self.a_tensor[i:(i+100)]).detach().cpu().numpy()
+            rewards[(i*100):(i*100+100)] = self.reward_model(self.o_tensor[(i*100):(i*100+100)], self.a_tensor[i:(i+100)]).detach().cpu().numpy()
 
         terminals = self.dataset["terminals"]
         timeouts = self.dataset["timeouts"]
@@ -92,8 +96,10 @@ class CQLTrainer(Trainer):
             #     self.scheduler.step()
 
         # self.model.fit(self.mdp_dataset, n_steps=num_steps, n_steps_per_epoch=num_steps, save_metrics=False, verbose=False)
+
         assert num_steps % 10 == 0
-        info = self.model.fit(self.mdp_dataset, n_steps=2 * num_steps, n_steps_per_epoch=10, save_metrics=False,verbose=False, show_progress=False)
+        # d3rlpy提供的训练接口，训1000个epoch，每个epoch 10次训练，总共100个epoch（为了方便统计）
+        info = self.model.fit(self.mdp_dataset, n_steps=5 * num_steps, n_steps_per_epoch=10, save_metrics=False,verbose=False, show_progress=False)
 
         logs['time/training'] = time.time() - train_start
 
@@ -127,5 +133,5 @@ class CQLTrainer(Trainer):
         return logs
 
     def train_step(self, reporter):
-
+        # interleave的reward训练
         self.train_rewarder(1, reporter)

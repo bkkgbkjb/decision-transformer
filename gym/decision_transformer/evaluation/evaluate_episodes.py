@@ -157,14 +157,14 @@ def evaluate_episode_plain(
         eval_no_change=True
     ):
 
-    model.eval()
-    model.to(device=device)
+    # model.eval()
+    # model.to(device=device)
 
-    state_mean = torch.from_numpy(state_mean).to(device=device)
-    state_std = torch.from_numpy(state_std).to(device=device)
+    state_mean = torch.from_numpy(state_mean)
+    state_std = torch.from_numpy(state_std)
 
     state = env.reset()
-    state = (state - state_mean) / state_std
+    state = (torch.from_numpy(state).float() - state_mean) / state_std
 
     episode_return, episode_length = 0, 0
     for t in range(max_ep_len):
@@ -173,7 +173,7 @@ def evaluate_episode_plain(
 
         state, reward, done, _ = env.step(action)
 
-        state = (state - state_mean) / state_std
+        state = (torch.from_numpy(state).float() - state_mean) / state_std
 
         episode_return += reward
         episode_length += 1

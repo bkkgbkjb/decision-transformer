@@ -462,9 +462,9 @@ def experiment(
     max_perf = -1e7
     last_saved_idx = -1
     if model_type == 'pbcql':
-        trainer.train_rewarder(int(1e2),reporter=reporter)
+        trainer.train_rewarder(reporter=reporter)
     for iter in range(variant['max_iters']):
-        outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True)
+        outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True, reporter=reporter)
         norm_return_mean = outputs[f'evaluation/target_{env_targets[0]}_norm_return_mean']
         if (variant['force_save_model'] or variant.get("in_tune", False)) and iter >= 10 and (norm_return_mean > max_perf or (iter - last_saved_idx > 20)):
             folder = f"./model_weight_{name}"
