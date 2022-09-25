@@ -142,6 +142,47 @@ def evaluate_episode_rtg(
 
     return episode_return, episode_length
 
+def evaluate_episode_plain(
+        env,
+        state_dim,
+        act_dim,
+        model,
+        max_ep_len=1000,
+        scale=1000.,
+        state_mean=0.,
+        state_std=1.,
+        device='cuda',
+        # target_return=None,
+        mode='normal',
+        eval_no_change=True
+    ):
+
+    model.eval()
+    model.to(device=device)
+
+    state_mean = torch.from_numpy(state_mean).to(device=device)
+    state_std = torch.from_numpy(state_std).to(device=device)
+
+    state = env.reset()
+    state = (state - state_mean) / state_std
+
+    episode_return, episode_length = 0, 0
+    for t in range(max_ep_len):
+
+        action = model.predict([state])[0]
+
+        state, reward, done, _ = env.step(action)
+
+        state = (state - state_mean) / state_std
+
+        episode_return += reward
+        episode_length += 1
+
+        if done:
+            break
+
+    return episode_return, episode_length
+
 def evaluate_episode_phi(
         env,
         state_dim,

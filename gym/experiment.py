@@ -1,4 +1,5 @@
 import setup
+from datetime import datetime
 from setup import seed
 import gym
 import numpy as np
@@ -12,7 +13,7 @@ import pickle
 import random
 import sys
 
-from decision_transformer.evaluation.evaluate_episodes import evaluate_episode, evaluate_episode_rtg, evaluate_episode_phi
+from decision_transformer.evaluation.evaluate_episodes import evaluate_episode, evaluate_episode_rtg, evaluate_episode_phi, evaluate_episode_plain
 from decision_transformer.models.decision_transformer import DecisionTransformer
 from decision_transformer.models.encoder_transformer import EncoderTransformer
 from decision_transformer.models.preference_decision_transformer import PreferenceDecisionTransformer
@@ -20,10 +21,13 @@ from decision_transformer.models.mlp_bc import MLPBCModel
 from decision_transformer.training.act_trainer import ActTrainer
 from decision_transformer.training.seq_trainer import SequenceTrainer
 from decision_transformer.training.pdt_trainer import PDTTrainer
+from decision_transformer.training.pbcql_trainer import CQLTrainer
 from reporter import get_reporter
+from decision_transformer.models.reward_model import RewardModel
 
 from d4rl.infos import REF_MIN_SCORE, REF_MAX_SCORE
 import os
+import d3rlpy
 
 
 def discount_cumsum(x, gamma):
@@ -42,7 +46,8 @@ def experiment(
     exp_name = json.dumps(variant, indent=4, sort_keys=True)
     device = variant.get('device', 'cuda')
     log_to_wandb = variant.get('log_to_wandb', False)
-
+    d4rlenv = gym.make(f"{variant['env']}-{variant['dataset']}-v2")
+    d4rldataset = d4rlenv.get_dataset()
     env_name, dataset = variant['env'], variant['dataset']
     model_type = variant['model_type']
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
@@ -139,7 +144,7 @@ def experiment(
     # TODO: 这里好像有问题，并不是在根据timesteps做sample
     p_sample = traj_lens[sorted_inds] / sum(traj_lens[sorted_inds])
 
-    def get_batch(batch_size=256, max_len=K):
+    def get_batch(batch_size=256, max_len=K, reward_model=None, rew_tra=False):
         batch_inds = np.random.choice(
             np.arange(num_trajectories),
             size=batch_size,
@@ -176,11 +181,19 @@ def experiment(
                     # rtg.append((np.sum(traj['rewards'][si:si + s[-1].shape[1]])).reshape(1,1,1).repeat(s[-1].shape[1] + 1, axis=1))
 
             else:
-                rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
+                if rew_tra:
+                    rtg.append(discount_cumsum(traj['rewards'][si:si+K], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
+                elif reward_model != None:
+                    s_temp = torch.from_numpy(traj['observations'][si:]).to(device=device)
+                    a_temp = torch.from_numpy(traj['actions'][si:]).to(device=device)
+                    r_temp = reward_model(s_temp, a_temp).detach().cpu().numpy()
+                    rtg.append(discount_cumsum(r_temp, gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
+                else:
+                    rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
             # print(f"rtg is: {rtg[-1]}")
 
             if rtg[-1].shape[1] <= s[-1].shape[1]:
-                assert False
+                # assert False
                 rtg[-1] = np.concatenate([rtg[-1], np.zeros((1, 1, 1))], axis=1)
 
             # padding and state + reward normalization
@@ -229,6 +242,22 @@ def experiment(
                             device=device,
                             eval_no_change=variant['eval_no_change']
                         )
+                    elif model_type == 'pbcql':
+                        ret, length = evaluate_episode_plain(
+                            env,
+                            state_dim,
+                            act_dim,
+                            model,
+                            max_ep_len=max_ep_len,
+                            scale=scale,
+                            # target_return=target_rew/scale if not variant['subepisode'] else target_rew / scale,
+                            mode=mode,
+                            state_mean=state_mean,
+                            state_std=state_std,
+                            device=device,
+                            eval_no_change=variant['eval_no_change']
+                        )
+
                     elif model_type == 'pdt':
                         ret, length = evaluate_episode_phi(
                             env,
@@ -294,6 +323,8 @@ def experiment(
             resid_pdrop=variant['dropout'],
             attn_pdrop=variant['dropout'],
         )
+    elif model_type == 'pbcql':
+        model = d3rlpy.algos.CQL(use_gpu=True)
     elif model_type == 'bc':
         model = MLPBCModel(
             state_dim=state_dim,
@@ -321,18 +352,18 @@ def experiment(
     else:
         raise NotImplementedError
 
-    model = model.to(device=device)
+    # model = model.to(device=device)
 
     warmup_steps = variant['warmup_steps']
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=variant['learning_rate'],
-        weight_decay=variant['weight_decay'],
-    )
-    scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer,
-        lambda steps: min((steps+1)/warmup_steps, 1)
-    )
+    # optimizer = torch.optim.AdamW(
+    #     model.parameters(),
+    #     lr=variant['learning_rate'],
+    #     weight_decay=variant['weight_decay'],
+    # )
+    # scheduler = torch.optim.lr_scheduler.LambdaLR(
+    #     optimizer,
+    #     lambda steps: min((steps+1)/warmup_steps, 1)
+    # )
 
     if model_type == 'pdt':
         en_model = EncoderTransformer(
@@ -364,6 +395,16 @@ def experiment(
             lr=variant["w_lr"],
             weight_decay=1e-4
         )
+    if model_type in ['dtpr', 'pbcql']:
+        reward_model = RewardModel(
+            state_dim=state_dim,
+            act_dim=act_dim,
+            device=device,
+        )
+        reward_optimizer = torch.optim.AdamW(
+            reward_model.parameters(),
+            lr=3e-4,
+        )
 
     if model_type == 'dt':
         trainer = SequenceTrainer(
@@ -375,6 +416,8 @@ def experiment(
             loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
             eval_fns=[eval_episodes(tar) for tar in env_targets],
         )
+    elif model_type == 'pbcql':
+        trainer = CQLTrainer(model=model,reward_model=reward_model,batch_size=batch_size,reward_optimizer=reward_optimizer,get_batch=get_batch, eval_fns=[eval_episodes(tar) for tar in env_targets],dataset=d4rldataset,state_mean=state_mean,state_std=state_std,device=device)
     elif model_type == 'bc':
         trainer = ActTrainer(
             model=model,
@@ -403,6 +446,7 @@ def experiment(
             phi_norm_loss_ratio=variant["phi_norm_loss_ratio"]
         )
 
+    name = f"pbcql-{variant['env']}-{variant['dataset']}-{variant['model_type']}-{variant['seed']}-{datetime.now().strftime('%f')}"
     if log_to_wandb:
         # wandb.init(
         #     name=exp_prefix,
@@ -411,19 +455,24 @@ def experiment(
         #     config=variant
         # )
 
-        name = f"{variant['env']}-{variant['dataset']}-{variant['model_type']}"
+        # name = f"{variant['env']}-{variant['dataset']}-{variant['model_type']}"
         reporter = get_reporter(name, exp_name)
         # wandb.watch(model)  # wandb has some bug
 
     max_perf = -1e7
     last_saved_idx = -1
+    if model_type == 'pbcql':
+        trainer.train_rewarder(int(1e2),reporter=reporter)
     for iter in range(variant['max_iters']):
         outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True)
         norm_return_mean = outputs[f'evaluation/target_{env_targets[0]}_norm_return_mean']
-        if variant.get("in_tune", False) and iter >= 10 and (norm_return_mean > max_perf or (iter - last_saved_idx > 20)):
-            if not os.path.exists("./model_weight"):
-                os.mkdir("./model_weight")
-            torch.save((en_model.state_dict(), w, model.state_dict()), f"./model_weight/params_{iter}.pt")
+        if (variant['force_save_model'] or variant.get("in_tune", False)) and iter >= 10 and (norm_return_mean > max_perf or (iter - last_saved_idx > 20)):
+            folder = f"./model_weight_{name}"
+            if not os.path.exists(folder):
+                os.mkdir(folder)
+            # torch.save((model.state_dict(), reward_model.state_dict()), f"./{folder}/params_{iter}.pt")
+            model.save_model(f"./{folder}/params_model_{iter}.pt")
+            torch.save((reward_model.state_dict()), f"./{folder}/params_{iter}.pt")
             max_perf = norm_return_mean
             last_saved_idx = iter
         if log_to_wandb:
