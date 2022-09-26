@@ -233,7 +233,7 @@ def experiment(
     en_model = en_model.to(device=device)
 
 
-    MODEL_WEIGHT = f"./tsne/model_weight/{variant['env']}_{variant['dataset']}.pt"
+    MODEL_WEIGHT = f"./tsne/as_model_weight/{variant['env']}_{variant['dataset']}.pt"
     (en_model_p, w, _) = torch.load(MODEL_WEIGHT)
     en_model.load_state_dict(en_model_p)
     en_model.eval()
@@ -266,8 +266,8 @@ def experiment(
     assert z_norm.shape[0] % BACKET_NUM == 0
     df["y"] = np.arange(z_norm.shape[0]) / z_norm.shape[0]
 
-    df.to_csv(f"./tsne/dataframe/{variant['env']}_{variant['dataset']}.csv")
-    np.save(f"./tsne/dataframe/{variant['env']}_{variant['dataset']}", w_z)
+    df.to_csv(f"./tsne/as_dataframe/{variant['env']}_{variant['dataset']}.csv")
+    np.save(f"./tsne/as_dataframe/{variant['env']}_{variant['dataset']}", w_z)
     # sns.scatterplot(
     #     x="comp-1",
     #     y="comp-2",

@@ -49,8 +49,8 @@ def experiment(
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
     exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
 
-    df = pd.read_csv(f"./tsne/dataframe/{variant['env']}_{variant['dataset']}.csv")
-    w_z = np.load(f"./tsne/dataframe/{variant['env']}_{variant['dataset']}.npy")
+    df = pd.read_csv(f"./tsne/as_dataframe/{variant['env']}_{variant['dataset']}.csv")
+    w_z = np.load(f"./tsne/as_dataframe/{variant['env']}_{variant['dataset']}.npy")
     sns.scatterplot(
         x="comp-1",
         y="comp-2",
@@ -59,7 +59,7 @@ def experiment(
         data=df,
     ).set(title="TSNE")
     plt.scatter(x=w_z[0], y=w_z[1], marker="x", s=1000)
-    plt.savefig(f"./tsne/imgs/{variant['env']}_{variant['dataset']}.png")
+    plt.savefig(f"./tsne/as_imgs/{variant['env']}_{variant['dataset']}.png")
     # plt.show()
 
 
