@@ -418,7 +418,7 @@ def experiment(
             eval_fns=[eval_episodes(tar) for tar in env_targets],
         )
     elif model_type == 'pbcql':
-        trainer = CQLTrainer(model=model,reward_model=reward_model,batch_size=batch_size,reward_optimizer=reward_optimizer,get_batch=get_batch, eval_fns=[eval_episodes(tar) for tar in env_targets],dataset=d4rldataset,state_mean=state_mean,state_std=state_std,device=device)
+        trainer = CQLTrainer(model=model,reward_model=reward_model,batch_size=batch_size,reward_optimizer=reward_optimizer,get_batch=get_batch, eval_fns=[eval_episodes(tar) for tar in env_targets],dataset=d4rldataset,state_mean=state_mean,state_std=state_std,device=device, model_type=model_type)
     elif model_type == 'bc':
         trainer = ActTrainer(
             model=model,
@@ -464,6 +464,8 @@ def experiment(
     last_saved_idx = -1
     if model_type == 'pbcql':
         trainer.train_rewarder(reporter=reporter)
+    if model_type in ['ocql', 'pbcql']:
+        trainer.relabel()
     for iter in range(variant['max_iters']):
         outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True, reporter=reporter)
         norm_return_mean = outputs[f'evaluation/target_{env_targets[0]}_norm_return_mean']

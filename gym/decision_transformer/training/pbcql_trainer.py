@@ -14,7 +14,7 @@ import math
 
 class CQLTrainer(Trainer):
 
-    def __init__(self, model, batch_size, reward_model, reward_optimizer,  get_batch, dataset, state_mean, state_std, device,  scheduler=None, eval_fns=None):
+    def __init__(self, model, batch_size, reward_model, reward_optimizer,  get_batch, dataset, state_mean, state_std, device, model_type,  scheduler=None, eval_fns=None):
         super().__init__(model, None, batch_size, get_batch, None, scheduler, eval_fns)
         self.reward_model = reward_model
         self.reward_optimizer = reward_optimizer
@@ -27,6 +27,8 @@ class CQLTrainer(Trainer):
 
         self.o_tensor = (torch.from_numpy(self.dataset['observations']).float().to(device) - self.state_mean) / self.state_std
         self.a_tensor = torch.from_numpy(self.dataset['actions']).float().to(device)
+        self.model_type = model_type
+        assert self.model_type in ['ocql', 'pbcql']
     
     def train_rewarder(self, num_iters = int(1e4), reporter = None):
         for _ in range(num_iters):
@@ -73,7 +75,7 @@ class CQLTrainer(Trainer):
             # actions=np.array(actions, dtype=np.float32),
             observations=self.o_tensor.cpu().detach().numpy(),
             actions=self.a_tensor.cpu().detach().numpy(),
-            rewards=np.array(rewards, dtype=np.float32),
+            rewards=np.array(self.dataset['rewards'] if self.model_type == 'ocql' else rewards, dtype=np.float32),
             terminals=np.array(terminals, dtype=np.float32),
             episode_terminals=np.array(episode_terminals, dtype=np.float32),
         )
@@ -85,12 +87,6 @@ class CQLTrainer(Trainer):
 
         train_start = time.time()
 
-        self.relabel()
-
-        # self.model.train()
-        for i in tqdm(range(num_steps)):
-            if i % 10 == 0:
-                self.train_step(reporter)
 
             # if self.scheduler is not None:
             #     self.scheduler.step()
@@ -99,7 +95,7 @@ class CQLTrainer(Trainer):
 
         assert num_steps % 10 == 0
         # d3rlpy提供的训练接口，训1000个epoch，每个epoch 10次训练，总共100个epoch（为了方便统计）
-        info = self.model.fit(self.mdp_dataset, n_steps=1 * num_steps if self.trained_iterations < 5 else 4 * num_steps, n_steps_per_epoch=10, save_metrics=False,verbose=False, show_progress=False)
+        info = self.model.fit(self.mdp_dataset, n_steps=int(num_steps / 2), n_steps_per_epoch=10, save_metrics=False,verbose=False, show_progress=False)
 
         logs['time/training'] = time.time() - train_start
 
