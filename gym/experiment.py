@@ -43,6 +43,7 @@ def experiment(
         variant,
 ):
     seed(variant['seed'])
+    d3rlpy.seed(variant['seed'])
     exp_name = json.dumps(variant, indent=4, sort_keys=True)
     device = variant.get('device', 'cuda')
     log_to_wandb = variant.get('log_to_wandb', False)

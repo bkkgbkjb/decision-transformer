@@ -20,7 +20,7 @@ class CQLTrainer(Trainer):
         self.reward_optimizer = reward_optimizer
         self.CEloss = torch.nn.CrossEntropyLoss()
 
-        self.trained_steps = 0
+        self.trained_iterations = 0
         self.dataset = dataset
         self.state_mean=torch.from_numpy(state_mean).float().to(device)
         self.state_std=torch.from_numpy(state_std).float().to(device)
@@ -28,7 +28,7 @@ class CQLTrainer(Trainer):
         self.o_tensor = (torch.from_numpy(self.dataset['observations']).float().to(device) - self.state_mean) / self.state_std
         self.a_tensor = torch.from_numpy(self.dataset['actions']).float().to(device)
     
-    def train_rewarder(self, num_iters = int(5e4), reporter = None):
+    def train_rewarder(self, num_iters = int(1e4), reporter = None):
         for _ in range(num_iters):
             # Review: 这里没来得及看，可能需要仔细对下看和PbDT是否一致
             states_1, actions_1, rewards_1, dones_1, rtg_1, timesteps_1, attention_mask_1 = self.get_batch(self.batch_size, rew_tra = True)
@@ -62,7 +62,7 @@ class CQLTrainer(Trainer):
         # 是为了切分再在gpu上预测，不然可能cuda oom
         # Review: 可能需要仔细看下
         for i in range(math.ceil(self.o_tensor.size(0) / 100)):
-            rewards[(i*100):(i*100+100)] = self.reward_model(self.o_tensor[(i*100):(i*100+100)], self.a_tensor[i:(i+100)]).detach().cpu().numpy()
+            rewards[(i*100):(i*100+100)] = self.reward_model(self.o_tensor[(i*100):(i*100+100)], self.a_tensor[(i*100):(i*100+100)]).detach().cpu().numpy()
 
         terminals = self.dataset["terminals"]
         timeouts = self.dataset["timeouts"]
@@ -99,7 +99,7 @@ class CQLTrainer(Trainer):
 
         assert num_steps % 10 == 0
         # d3rlpy提供的训练接口，训1000个epoch，每个epoch 10次训练，总共100个epoch（为了方便统计）
-        info = self.model.fit(self.mdp_dataset, n_steps=5 * num_steps, n_steps_per_epoch=10, save_metrics=False,verbose=False, show_progress=False)
+        info = self.model.fit(self.mdp_dataset, n_steps=1 * num_steps if self.trained_iterations < 5 else 4 * num_steps, n_steps_per_epoch=10, save_metrics=False,verbose=False, show_progress=False)
 
         logs['time/training'] = time.time() - train_start
 
@@ -130,6 +130,7 @@ class CQLTrainer(Trainer):
             for k, v in logs.items():
                 print(f'{k}: {v}')
 
+        self.trained_iterations += 1
         return logs
 
     def train_step(self, reporter):
