@@ -240,6 +240,7 @@ def experiment(
     
     st_states = torch.stack([torch.from_numpy(state).float() for (state, _, _, _, _) in sub_trajectories]).to(device)
     st_actions = torch.stack([torch.from_numpy(action).float() for (_, action, _, _, _) in sub_trajectories]).to(device)
+    st_rewards = torch.tensor([reward for (_, _, reward, _, _) in sub_trajectories]).to(device)
     st_timesteps = torch.stack([torch.from_numpy(t).long() for (_, _, _, t, _) in sub_trajectories]).to(device)
     st_masks = torch.stack([torch.from_numpy(mask).long() for (_, _, _, _, mask) in sub_trajectories]).to(device)
 
@@ -265,6 +266,7 @@ def experiment(
     df["comp-2"] = z_norm[:, 1]
     assert z_norm.shape[0] % BACKET_NUM == 0
     df["y"] = np.arange(z_norm.shape[0]) / z_norm.shape[0]
+    df['return'] = st_rewards.detach().cpu().numpy()
 
     df.to_csv(f"./tsne/dataframe/{variant['env']}_{variant['dataset']}.csv")
     np.save(f"./tsne/dataframe/{variant['env']}_{variant['dataset']}", w_z)
