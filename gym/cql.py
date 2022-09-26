@@ -35,7 +35,7 @@ for i in range(100):
 
 	print(f"finish evaluation {i}: total_rwd: {np.mean(total_rwds)}, {np.std(total_rwds)}")
 
-	info = cql.fit(dataset, n_steps=int(1e3), n_steps_per_epoch=10, save_metrics=False,verbose=False,show_progress=False)
+	info = cql.fit(dataset, n_steps=int(1e3 / 2), n_steps_per_epoch=10, save_metrics=False,verbose=False,show_progress=False)
 	logs = dict()
 	logs['training/alpha'] = np.mean([i[1]['alpha'] for i in info])
 	logs['training/alpha_loss_mean'] = np.mean([i[1]['alpha_loss'] for i in info])
