@@ -266,15 +266,17 @@ def experiment(
     assert z_norm.shape[0] % BACKET_NUM == 0
     df["y"] = np.arange(z_norm.shape[0]) / z_norm.shape[0]
 
-    sns.scatterplot(
-        x="comp-1",
-        y="comp-2",
-        hue=df.y.tolist(),
-        # palette=sns.color_palette("hls", BACKET_NUM),
-        data=df,
-    ).set(title="TSNE")
-    plt.scatter(x=w_z[0], y=w_z[1], marker="x", s=1000)
-    plt.savefig(f"./tsne/imgs/{variant['env']}_{variant['dataset']}.png")
+    df.to_csv(f"./tsne/dataframe/{variant['env']}_{variant['dataset']}.csv")
+    np.save(f"./tsne/dataframe/{variant['env']}_{variant['dataset']}", w_z)
+    # sns.scatterplot(
+    #     x="comp-1",
+    #     y="comp-2",
+    #     hue=df.y.tolist(),
+    #     # palette=sns.color_palette("hls", BACKET_NUM),
+    #     data=df,
+    # ).set(title="TSNE")
+    # plt.scatter(x=w_z[0], y=w_z[1], marker="x", s=1000)
+    # plt.savefig(f"./tsne/imgs/{variant['env']}_{variant['dataset']}.png")
     # plt.show()
 
 
