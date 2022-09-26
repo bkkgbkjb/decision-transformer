@@ -243,7 +243,7 @@ def experiment(
                             device=device,
                             eval_no_change=variant['eval_no_change']
                         )
-                    elif model_type == 'pbcql':
+                    elif model_type in ['pbcql', 'ocql']:
                         ret, length = evaluate_episode_plain(
                             env,
                             state_dim,
@@ -324,7 +324,7 @@ def experiment(
             resid_pdrop=variant['dropout'],
             attn_pdrop=variant['dropout'],
         )
-    elif model_type == 'pbcql':
+    elif model_type in ['pbcql', 'ocql']:
         model = d3rlpy.algos.CQL(use_gpu=True)
     elif model_type == 'bc':
         model = MLPBCModel(
@@ -396,7 +396,7 @@ def experiment(
             lr=variant["w_lr"],
             weight_decay=1e-4
         )
-    if model_type in ['dtpr', 'pbcql']:
+    if model_type in ['dtpr', 'pbcql', 'ocql']:
         reward_model = RewardModel(
             state_dim=state_dim,
             act_dim=act_dim,
@@ -417,7 +417,7 @@ def experiment(
             loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
             eval_fns=[eval_episodes(tar) for tar in env_targets],
         )
-    elif model_type == 'pbcql':
+    elif model_type in ['pbcql', 'ocql']:
         trainer = CQLTrainer(model=model,reward_model=reward_model,batch_size=batch_size,reward_optimizer=reward_optimizer,get_batch=get_batch, eval_fns=[eval_episodes(tar) for tar in env_targets],dataset=d4rldataset,state_mean=state_mean,state_std=state_std,device=device, model_type=model_type)
     elif model_type == 'bc':
         trainer = ActTrainer(
