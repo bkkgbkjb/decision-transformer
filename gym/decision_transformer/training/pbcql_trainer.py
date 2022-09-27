@@ -95,7 +95,7 @@ class CQLTrainer(Trainer):
 
         assert num_steps % 10 == 0
         # d3rlpy提供的训练接口，训1000个epoch，每个epoch 10次训练，总共100个epoch（为了方便统计）
-        info = self.model.fit(self.mdp_dataset, n_steps=int(num_steps / 2), n_steps_per_epoch=10, save_metrics=False,verbose=False, show_progress=False)
+        info = self.model.fit(self.mdp_dataset, n_steps=int(num_steps * 4), n_steps_per_epoch=int(num_steps * 4) / 10, save_metrics=False,verbose=False, show_progress=False)
 
         logs['time/training'] = time.time() - train_start
 
