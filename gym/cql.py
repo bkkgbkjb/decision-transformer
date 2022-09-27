@@ -34,11 +34,11 @@ env = gym.make("Hopper-v3")
 env.seed(0)
 d3rlpy.seed(0)
 
-cql = d3rlpy.algos.CQL(use_gpu=True)
+cql = d3rlpy.algos.TD3PlusBC(use_gpu=True)
 
 # cql.build_with_dataset(dataset)
 
-reporter = get_reporter("original_cql")
+reporter = get_reporter("original_td3pbc")
 
 terminals = d4rldataset["terminals"]
 timeouts = d4rldataset["timeouts"]
@@ -72,10 +72,10 @@ for i in range(100):
 
 	print(f"finish evaluation {i}: total_rwd: {np.mean(total_rwds)}, {np.std(total_rwds)}")
 
-	info = cql.fit(mdp_dataset, n_steps=int(1e3 / 2), n_steps_per_epoch=10, save_metrics=False,verbose=False,show_progress=False)
+	info = cql.fit(mdp_dataset, n_steps=int(1e3 * 4.5), n_steps_per_epoch=10, save_metrics=False,verbose=False,show_progress=False)
 	logs = dict()
-	logs['training/alpha'] = np.mean([i[1]['alpha'] for i in info])
-	logs['training/alpha_loss_mean'] = np.mean([i[1]['alpha_loss'] for i in info])
+	# logs['training/alpha'] = np.mean([i[1]['alpha'] for i in info])
+	# logs['training/alpha_loss_mean'] = np.mean([i[1]['alpha_loss'] for i in info])
 	logs['training/actor_loss_mean'] = np.mean([i[1]['actor_loss'] for i in info])
 	logs['training/critic_loss_mean'] = np.mean([i[1]['critic_loss'] for i in info])
 	reporter({'return_mean': np.mean(total_rwds), 'return_std': np.std(total_rwds), **logs})
