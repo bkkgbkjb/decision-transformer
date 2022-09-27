@@ -325,7 +325,8 @@ def experiment(
             attn_pdrop=variant['dropout'],
         )
     elif model_type in ['pbcql', 'ocql']:
-        model = d3rlpy.algos.CQL(use_gpu=True)
+        # model = d3rlpy.algos.CQL(use_gpu=True)
+        model = d3rlpy.algos.CQL(use_gpu=True, alpha_learning_rate=0.0)
     elif model_type == 'bc':
         model = MLPBCModel(
             state_dim=state_dim,

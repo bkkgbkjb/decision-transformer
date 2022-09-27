@@ -95,7 +95,7 @@ class CQLTrainer(Trainer):
 
         assert num_steps % 10 == 0
         # d3rlpy提供的训练接口，训1000个epoch，每个epoch 10次训练，总共100个epoch（为了方便统计）
-        info = self.model.fit(self.mdp_dataset, n_steps=int(num_steps / 2), n_steps_per_epoch=10, save_metrics=False,verbose=False, show_progress=False)
+        info = self.model.fit(self.mdp_dataset, n_steps=int(num_steps * 4.5), n_steps_per_epoch=int(num_steps * 4.5) / 100, save_metrics=False,verbose=False, show_progress=False)
 
         logs['time/training'] = time.time() - train_start
 
@@ -109,8 +109,8 @@ class CQLTrainer(Trainer):
 
         logs['time/total'] = time.time() - self.start_time
         logs['time/evaluation'] = time.time() - eval_start
-        logs['training/alpha'] = np.mean([i[1]['alpha'] for i in info])
-        logs['training/alpha_loss_mean'] = np.mean([i[1]['alpha_loss'] for i in info])
+        # logs['training/alpha'] = np.mean([i[1]['alpha'] for i in info])
+        # logs['training/alpha_loss_mean'] = np.mean([i[1]['alpha_loss'] for i in info])
         logs['training/actor_loss_mean'] = np.mean([i[1]['actor_loss'] for i in info])
         logs['training/critic_loss_mean'] = np.mean([i[1]['critic_loss'] for i in info])
         # logs['training/train_loss_mean'] = np.mean(train_losses)
