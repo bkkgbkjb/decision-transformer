@@ -28,7 +28,7 @@ class CQLTrainer(Trainer):
         self.o_tensor = (torch.from_numpy(self.dataset['observations']).float().to(device) - self.state_mean) / self.state_std
         self.a_tensor = torch.from_numpy(self.dataset['actions']).float().to(device)
         self.model_type = model_type
-        assert self.model_type in ['ocql', 'pbcql']
+        assert self.model_type in ['ocql', 'pbtd3']
     
     def train_rewarder(self, num_iters = int(1e4), reporter = None):
         for _ in range(num_iters):
