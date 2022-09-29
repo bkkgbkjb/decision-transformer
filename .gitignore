@@ -6,3 +6,4 @@ gym/data/*.pkl
 *.log
 ray
 model_weight*
+*.zip
