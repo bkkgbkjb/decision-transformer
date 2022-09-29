@@ -17,6 +17,7 @@ python download_d4rl_datasets.py
 
 ### Training
 ```shell
+cd gym
 # in a virtualenv
 python experiment.py -h
 ```
