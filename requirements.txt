@@ -17,7 +17,6 @@ colorlog==6.7.0
 configparser==5.3.0
 Cython==0.29.32
 d3rlpy==1.1.1
-d4rl==1.1
 distlib==0.3.6
 dm-control==1.0.7
 dm-env==1.5
@@ -50,7 +49,6 @@ lxml==4.9.1
 Mako==1.2.2
 Markdown==3.4.1
 MarkupSafe==2.1.1
-mjrl==1.0.0
 msgpack==1.0.4
 mujoco==2.2.2
 mujoco-py==2.1.2.14
