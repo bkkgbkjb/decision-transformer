@@ -137,7 +137,6 @@ def experiment(
     sorted_inds = sorted_inds[-num_trajectories:]
 
     # used to reweight sampling so we sample according to timesteps instead of trajectories
-    # TODO: 这里好像有问题，并不是在根据timesteps做sample
     p_sample = traj_lens[sorted_inds] / sum(traj_lens[sorted_inds])
 
     def get_batch(batch_size=256, max_len=K):
@@ -150,14 +149,11 @@ def experiment(
 
         s, a, r, d, rtg, timesteps, mask = [], [], [], [], [], [], []
         for i in range(batch_size):
-            # TODO: 这里好像是优先级sample
             traj = trajectories[int(sorted_inds[batch_inds[i]])]
             si = random.randint(0, traj['rewards'].shape[0] - 1)
 
             # get sequences from dataset
 
-            # reshape是在unsqueeze(0)
-            # 如果si取到很后面的，si + max_len 就会超界，此时tlen < max_len
             s.append(traj['observations'][si:si + max_len].reshape(1, -1, state_dim))
             a.append(traj['actions'][si:si + max_len].reshape(1, -1, act_dim))
             r.append(traj['rewards'][si:si + max_len].reshape(1, -1, 1))
@@ -186,13 +182,11 @@ def experiment(
 
             # padding and state + reward normalization
 
-            # TODO: 为什么在前面padding
             tlen = s[-1].shape[1]
             s[-1] = np.concatenate([np.zeros((1, max_len - tlen, state_dim)), s[-1]], axis=1)
             s[-1] = (s[-1] - state_mean) / state_std
             a[-1] = np.concatenate([np.ones((1, max_len - tlen, act_dim)) * -10., a[-1]], axis=1)
             r[-1] = np.concatenate([np.zeros((1, max_len - tlen, 1)), r[-1]], axis=1)
-            # TODO: 为什么要乘2
             d[-1] = np.concatenate([np.ones((1, max_len - tlen)) * 2, d[-1]], axis=1)
             rtg[-1] = np.concatenate([np.zeros((1, max_len - tlen, 1)), rtg[-1]], axis=1) / scale
             timesteps[-1] = np.concatenate([np.zeros((1, max_len - tlen)), timesteps[-1]], axis=1)
