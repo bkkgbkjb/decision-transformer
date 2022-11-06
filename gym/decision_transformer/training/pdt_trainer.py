@@ -36,7 +36,7 @@ class PDTTrainer(Trainer):
         self.device = device
 
         self.regress_loss = nn.MSELoss()
-        self.phi_loss = nn.MSELoss()
+        self.phi_loss = nn.ReLU()
         self.triplet_loss = nn.TripletMarginLoss(margin=1.0, p=2)
 
         self.pref_loss_ratio = pref_loss_ratio
@@ -120,8 +120,8 @@ class PDTTrainer(Trainer):
         # else:
 
         # phi = _phi
-        phi_norm_loss = (self.phi_loss(torch.norm(phi_1, dim=1), torch.ones(self.batch_size).to(self.device))
-                    + self.phi_loss(torch.norm(phi_2, dim=1), torch.ones(self.batch_size).to(self.device)))
+        phi_norm_loss = (self.phi_loss(torch.norm(phi_1, dim=1) - torch.ones(self.batch_size).to(self.device)).mean()
+                    + self.phi_loss(torch.norm(phi_2, dim=1) - torch.ones(self.batch_size).to(self.device)).mean())
         # phi_norm_loss = torch.norm(phi_1, dim=1).sum() + torch.norm(phi_2, dim=1).sum()
 
         positive = torch.cat((phi_1[lb], phi_2[rb]), 0)
