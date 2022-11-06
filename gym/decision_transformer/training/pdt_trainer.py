@@ -41,6 +41,7 @@ class PDTTrainer(Trainer):
 
         self.pref_loss_ratio = pref_loss_ratio
         self.phi_norm_loss_ratio = phi_norm_loss_ratio
+        self.recon_loss_simple = lambda pred, target: ((pred - target) ** 2 ).mean()
 
         self.total_data = 0
         self.used_data = 0
@@ -107,6 +108,8 @@ class PDTTrainer(Trainer):
 
         action_target_1 = torch.clone(actions_1)
         action_target_2 = torch.clone(actions_2)
+        state_target_1 = torch.clone(states_1)
+        state_target_2 = torch.clone(states_2)
 
         # pre = (rtg_1[:,0,0]>rtg_2[:,0,0]).to(dtype=torch.float32)
         margin = 0
@@ -157,13 +160,21 @@ class PDTTrainer(Trainer):
         action_preds_2 = action_preds_2.reshape(-1, act_dim)[attention_mask_2.reshape(-1) > 0]
         action_target_2 = action_target_2.reshape(-1, act_dim)[attention_mask_2.reshape(-1) > 0]
 
+        state_dim = state_preds_1.shape[2]
+        state_preds_1 = state_preds_1.reshape(-1, state_dim)[attention_mask_1.reshape(-1) > 0]
+        state_target_1 = state_target_1.reshape(-1, state_dim)[attention_mask_1.reshape(-1) > 0]
+
+        state_dim = state_preds_2.shape[2]
+        state_preds_2 = state_preds_2.reshape(-1, state_dim)[attention_mask_2.reshape(-1) > 0]
+        state_target_2 = state_target_2.reshape(-1, state_dim)[attention_mask_2.reshape(-1) > 0]
+
         recon_loss = (self.loss_fn(
-            None, action_preds_1, None,
-            None, action_target_1, None,
+            state_preds_1, action_preds_1, None,
+            state_target_1, action_target_1, None,
         )
         + self.loss_fn(
-            None, action_preds_2, None,
-            None, action_target_2, None,
+            state_preds_2, action_preds_2, None,
+            state_target_2, action_target_2, None,
         ))
 
         self.et_optimizer.zero_grad()
@@ -195,5 +206,6 @@ class PDTTrainer(Trainer):
 
         with torch.no_grad():
             self.diagnostics['training/action_error'] = torch.mean((action_preds_1-action_target_1)**2).detach().cpu().item()
+            self.diagnostics['training/state_error'] = torch.mean((state_preds_1-state_target_1)**2).detach().cpu().item()
 
         return pref_loss.detach().cpu().item(), recon_loss.detach().cpu().item(), phi_norm_loss.detach().cpu().item()
