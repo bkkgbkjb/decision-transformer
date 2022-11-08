@@ -154,6 +154,8 @@ def evaluate_episode_phi(
         device='cuda',
         phi=None,
         mode='normal',
+        in_antmaze=False,
+        goal = None
     ):
 
     model.eval()
@@ -165,6 +167,8 @@ def evaluate_episode_phi(
     state_std = torch.from_numpy(state_std).to(device=device)
 
     state = env.reset()
+    if in_antmaze:
+        env.set_target(goal)
     if mode == 'noise':
         state = state + np.random.normal(0, 0.1, size=state.shape)
 
