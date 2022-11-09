@@ -398,7 +398,7 @@ def experiment(
             phi_norm_loss_ratio=variant["phi_norm_loss_ratio"]
         )
 
-    name = f"{variant['env']}-{variant['dataset']}-{variant['model_type']}-{variant['seed']}-{datetime.now().strftime('%f')}"
+    name = f"no_time_for_phi_{variant['env']}-{variant['dataset']}-{variant['model_type']}-{variant['seed']}-{datetime.now().strftime('%m-%d-%H-%M-%S-%f')}"
     if log_to_wandb:
         # wandb.init(
         #     name=exp_prefix,
