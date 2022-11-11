@@ -72,7 +72,7 @@ class PreferenceDecisionTransformer(TrajectoryModel):
         # time embeddings are treated similar to positional embeddings
         state_embeddings = state_embeddings + time_embeddings
         action_embeddings = action_embeddings + time_embeddings
-        phi_embeddings = phi_embeddings + time_embeddings
+        phi_embeddings = phi_embeddings
 
         # this makes the sequence look like (R_1, s_1, a_1, R_2, s_2, a_2, ...)
         # which works nice in an autoregressive sense since states predict actions
