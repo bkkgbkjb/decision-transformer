@@ -25,8 +25,6 @@ from reporter import get_reporter
 
 from d4rl.infos import REF_MIN_SCORE, REF_MAX_SCORE
 import os
-from antmaze_info import GoalPoints
-import math
 
 
 def discount_cumsum(x, gamma):
@@ -51,7 +49,6 @@ def experiment(
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
     exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
 
-    in_antmaze = False
     if env_name == 'hopper':
         env = gym.make('Hopper-v3')
         max_ep_len = 1000
@@ -75,20 +72,16 @@ def experiment(
         scale = 10.
     elif env_name == "antmaze-medium":
         full_name = f"antmaze-medium-{dataset}-v2"
-        goal = GoalPoints[full_name]
-        env = gym.make(full_name, goal_sampler = lambda: np.array(list(goal)))
+        env = gym.make(full_name)
         max_ep_len = 1001
         env_targets = [1000]
         scale = 1000.
-        in_antmaze = True
     elif env_name == "antmaze-large":
         full_name = f"antmaze-large-{dataset}-v2"
-        goal = GoalPoints[full_name]
-        env = gym.make(full_name, goal_sampler = lambda: np.array(list(goal)))
+        env = gym.make(full_name)
         max_ep_len = 1001
         env_targets = [1000]
         scale = 1000.
-        in_antmaze = True
     else:
         raise NotImplementedError
     env.seed(variant['seed'])
@@ -108,41 +101,39 @@ def experiment(
     # save all path information into separate lists
     mode = variant.get('mode', 'normal')
     states, traj_lens, returns = [], [], []
-    new_trajectories = []
     for idx, path in enumerate(trajectories):
         if mode == 'delayed':  # delayed: all rewards moved to end of trajectory
             path['rewards'][-1] = path['rewards'].sum()
             path['rewards'][:-1] = 0.
-        if in_antmaze:
-            i = 0
-            reached = False
-            for pos in path['observations']:
-                if math.sqrt((pos[0] - goal[0]) ** 2 + (pos[1] - goal[1]) ** 2) <= 0.5:
-                    reached = True
-                    break
-                i += 1
-            
-            if i < 10:
-                # del trajectories[idx]
-                continue
-            
-            if reached:
-                for k in ['observations', 'actions', 'rewards', 'terminals']:
-                    path[k] = path[k][:i]
-                path['rewards'][:] = 1.0
-                path['terminals'][:] = False
-                path['terminals'][-1] = True
-            else:
-                path['rewards'][:] = 0.0
-                path['terminals'][:] = False
+        # if in_antmaze:
 
-            path['modified'] = True
-            new_trajectories.append(path)
+        #     i = 0
+        #     reached = False
+        #     for pos in path['observations']:
+        #         if math.sqrt((pos[0] - goal[0]) ** 2 + (pos[1] - goal[1]) ** 2) <= 0.5:
+        #             reached = True
+        #             break
+        #         i += 1
+            
+        #     if i < 10:
+        #         # del trajectories[idx]
+        #         continue
+            
+        #     if reached:
+        #         for k in ['observations', 'actions', 'rewards', 'terminals']:
+        #             path[k] = path[k][:i]
+        #         path['rewards'][:] = 1.0
+        #         path['terminals'][:] = False
+        #         path['terminals'][-1] = True
+        #     else:
+        #         path['rewards'][:] = 0.0
+        #         path['terminals'][:] = False
+
+        #     path['modified'] = True
+        #     new_trajectories.append(path)
         states.append(path['observations'])
         traj_lens.append(len(path['observations']))
         returns.append(path['rewards'].sum())
-    if in_antmaze:
-        trajectories = new_trajectories
     traj_lens, returns = np.array(traj_lens), np.array(returns)
 
     # used for input normalization
@@ -285,8 +276,6 @@ def experiment(
                             state_mean=state_mean,
                             state_std=state_std,
                             device=device,
-                            in_antmaze=in_antmaze,
-                            ** ({ "goal": goal } if in_antmaze else {}),
                         )
                     else:
                         ret, length = evaluate_episode(
