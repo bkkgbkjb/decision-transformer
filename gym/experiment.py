@@ -202,6 +202,38 @@ def experiment(
 
         return s, a, r, d, rtg, timesteps, mask
 
+    m_returns = None
+    def collect_pref_pairs(batch_size: int, mode: str):
+        assert mode == "pref"
+        nonlocal m_returns
+
+        if m_returns is not None:
+            idx = np.random.choice(variant['feedback'],
+                                    size=batch_size,
+                                    replace=True)
+            return ((m_returns[0][0][idx], m_returns[0][1][idx]),
+                    (m_returns[1][0][idx], m_returns[1][1][idx]),
+                    (m_returns[2][0][idx], m_returns[2][1][idx]),
+                    (m_returns[3][0][idx], m_returns[3][1][idx]),
+                    (m_returns[4][0][idx], m_returns[4][1][idx]),
+                    (m_returns[5][0][idx], m_returns[5][1][idx]),
+                    (m_returns[6][0][idx], m_returns[6][1][idx]))
+
+        states_1, actions_1, rewards_1, dones_1, rtg_1, timesteps_1, attention_mask_1 = get_batch(
+            variant['feedback'])
+        states_2, actions_2, rewards_2, dones_2, rtg_2, timesteps_2, attention_mask_2 = get_batch(
+            variant['feedback'])
+
+        assert states_1.size(0) == states_2.size(0) == variant['feedback']
+
+        m_returns = ((states_1, states_2), (actions_1, actions_2),
+                            (rewards_1, rewards_2), (dones_1, dones_2),
+                            (rtg_1, rtg_2), (timesteps_1, timesteps_2),
+                            (attention_mask_1, attention_mask_2))
+        return collect_pref_pairs(batch_size, mode)
+
+
+
     def eval_episodes(target_rew):
         largest_norm_return_mean = -1e7
         def fn(model):
@@ -389,7 +421,7 @@ def experiment(
             w=w,
             w_optimizer=w_optimizer,
             batch_size=batch_size,
-            get_batch=get_batch,
+            get_batch=lambda batch_size, mode: get_batch(batch_size) if mode =='normal' else collect_pref_pairs(batch_size, mode),
             scheduler=scheduler,
             loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
             eval_fns=[eval_episodes(tar) for tar in env_targets],
@@ -398,7 +430,7 @@ def experiment(
             phi_norm_loss_ratio=variant["phi_norm_loss_ratio"]
         )
 
-    name = f"{variant['env']}-{variant['dataset']}-{variant['model_type']}-{variant['seed']}-{datetime.now().strftime('%f')}"
+    name = f"feedback-{variant['env']}-{variant['dataset']}-{variant['model_type']}-{variant['seed']}-{datetime.now().strftime('%m-%d-%H-%M-%S-%f')}"
     if log_to_wandb:
         # wandb.init(
         #     name=exp_prefix,

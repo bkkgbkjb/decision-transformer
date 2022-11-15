@@ -102,8 +102,9 @@ class PDTTrainer(Trainer):
         return logs
 
     def train_step(self):
-        states_1, actions_1, rewards_1, dones_1, rtg_1, timesteps_1, attention_mask_1 = self.get_batch(self.batch_size)
-        states_2, actions_2, rewards_2, dones_2, rtg_2, timesteps_2, attention_mask_2 = self.get_batch(self.batch_size)
+        # states_1, actions_1, rewards_1, dones_1, rtg_1, timesteps_1, attention_mask_1 = self.get_batch(self.batch_size)
+        # states_2, actions_2, rewards_2, dones_2, rtg_2, timesteps_2, attention_mask_2 = self.get_batch(self.batch_size)
+        (states_1, states_2), (actions_1, actions_2), (rewards_1, rewards_2), (dones_1, dones_2), (rtg_1, rtg_2), (timesteps_1, timesteps_2), (attention_mask_1, attention_mask_2) = self.get_batch(self.batch_size, "pref")
 
         action_target_1 = torch.clone(actions_1)
         action_target_2 = torch.clone(actions_2)
@@ -179,6 +180,9 @@ class PDTTrainer(Trainer):
         torch.nn.utils.clip_grad_norm_(self.de_model.parameters(), .25)
         self.et_optimizer.step()
         self.optimizer.step()
+
+        states_1, actions_1, rewards_1, dones_1, rtg_1, timesteps_1, attention_mask_1 = self.get_batch(self.batch_size, "normal")
+        states_2, actions_2, rewards_2, dones_2, rtg_2, timesteps_2, attention_mask_2 = self.get_batch(self.batch_size, "normal")
 
         # phi = self.en_model.forward(states, actions, timesteps, attention_mask).detach()
         # pred_returns = torch.inner(phi, self.w)
