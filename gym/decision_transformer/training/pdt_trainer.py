@@ -36,7 +36,7 @@ class PDTTrainer(Trainer):
         self.device = device
 
         self.regress_loss = nn.MSELoss()
-        self.phi_loss = nn.MSELoss()
+        self.phi_loss = nn.ReLU()
         self.triplet_loss = nn.TripletMarginLoss(margin=1.0, p=2)
 
         self.pref_loss_ratio = pref_loss_ratio
@@ -51,6 +51,7 @@ class PDTTrainer(Trainer):
         regress_losses = []
         recon_losses = []
         phi_norm_losses = []
+        phi_recon_losses = []
 
         logs = dict()
 
@@ -59,10 +60,11 @@ class PDTTrainer(Trainer):
         self.en_model.train()
         self.de_model.train()
         for i in range(num_steps):
-            regress_loss, recon_loss, phi_norm_loss = self.train_step()
+            regress_loss, recon_loss, phi_norm_loss, phi_recon_loss = self.train_step()
             regress_losses.append(regress_loss)
             recon_losses.append(recon_loss)
             phi_norm_losses.append(phi_norm_loss)
+            phi_recon_losses.append(phi_recon_loss)
             if self.scheduler is not None:
                 self.scheduler.step()
 
@@ -86,6 +88,8 @@ class PDTTrainer(Trainer):
         logs['training/pref_loss_std'] = np.std(regress_losses)
         logs['training/train_loss_mean'] = np.mean(recon_losses)
         logs['training/train_loss_std'] = np.std(recon_losses)
+        logs['training/phi_recon_loss_mean'] = np.mean(phi_recon_losses)
+        logs['training/phi_recon_loss_std'] = np.std(phi_recon_losses)
         logs['training/phi_norm_loss_mean'] = np.mean(phi_norm_losses)
         logs['training/phi_norm_loss_std'] = np.std(phi_norm_losses)
         logs['training/used_data_perc'] = self.used_data / self.total_data * 100
@@ -107,6 +111,8 @@ class PDTTrainer(Trainer):
 
         action_target_1 = torch.clone(actions_1)
         action_target_2 = torch.clone(actions_2)
+        state_target_1 = torch.clone(states_1)
+        state_target_2 = torch.clone(states_2)
 
         # pre = (rtg_1[:,0,0]>rtg_2[:,0,0]).to(dtype=torch.float32)
         margin = 0
@@ -120,8 +126,8 @@ class PDTTrainer(Trainer):
         # else:
 
         # phi = _phi
-        phi_norm_loss = (self.phi_loss(torch.norm(phi_1, dim=1), torch.ones(self.batch_size).to(self.device))
-                    + self.phi_loss(torch.norm(phi_2, dim=1), torch.ones(self.batch_size).to(self.device)))
+        phi_norm_loss = (self.phi_loss(torch.norm(phi_1, dim=1) - torch.ones(self.batch_size).to(self.device)).mean()
+                    + self.phi_loss(torch.norm(phi_2, dim=1) - torch.ones(self.batch_size).to(self.device)).mean())
         # phi_norm_loss = torch.norm(phi_1, dim=1).sum() + torch.norm(phi_2, dim=1).sum()
 
         positive = torch.cat((phi_1[lb], phi_2[rb]), 0)
@@ -140,6 +146,9 @@ class PDTTrainer(Trainer):
         # ).mean()
         # regress_loss = self.regress_loss(pred_returns, rtg[:,-1].unsqueeze(1))
 
+        for param in self.de_model.parameters():
+            param.requires_grad = False
+
         phi_1 = phi_1.expand(states_1.shape[1], -1, -1).permute(1, 0, 2)
         state_preds_1, action_preds_1, reward_preds_1 = self.de_model.forward(
             states_1, actions_1, None, phi_1, timesteps_1, attention_mask=attention_mask_1,
@@ -157,40 +166,83 @@ class PDTTrainer(Trainer):
         action_preds_2 = action_preds_2.reshape(-1, act_dim)[attention_mask_2.reshape(-1) > 0]
         action_target_2 = action_target_2.reshape(-1, act_dim)[attention_mask_2.reshape(-1) > 0]
 
-        recon_loss = (self.loss_fn(
-            None, action_preds_1, None,
-            None, action_target_1, None,
+        phi_recon_loss = (self.loss_fn(
+            state_preds_1, action_preds_1, None,
+            state_target_1, action_target_1, None,
         )
         + self.loss_fn(
-            None, action_preds_2, None,
-            None, action_target_2, None,
+            state_preds_2, action_preds_2, None,
+            state_target_2, action_target_2, None,
         ))
 
-        total_loss = recon_loss + self.phi_norm_loss_ratio * phi_norm_loss + self.pref_loss_ratio * pref_loss
-        # if not torch.isnan(similar_loss):
-        #     total_loss += self.pref_loss_ratio * similar_loss
-        self.et_optimizer.zero_grad()
-        self.optimizer.zero_grad()
-        total_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.en_model.parameters(), .25)
-        torch.nn.utils.clip_grad_norm_(self.de_model.parameters(), .25)
-        self.et_optimizer.step()
-        self.optimizer.step()
+        for param in self.de_model.parameters():
+            param.requires_grad = True
 
-        # phi = self.en_model.forward(states, actions, timesteps, attention_mask).detach()
-        # pred_returns = torch.inner(phi, self.w)
-        # regress_loss = self.regress_loss(pred_returns, rtg[:,-1])
+        en_model_loss = (phi_recon_loss
+                        + self.pref_loss_ratio * pref_loss
+                        + self.phi_norm_loss_ratio * phi_norm_loss)
+                        # + 10 * returns_loss
+                        # + (phi_norm_loss if self.phi_norm == "soft" else 0)
+
+        self.et_optimizer.zero_grad()
+        en_model_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.en_model.parameters(), .25)
+        self.et_optimizer.step()
+
+        action_target_1 = torch.clone(actions_1)
+        action_target_2 = torch.clone(actions_2)
+        state_target_1 = torch.clone(states_1)
+        state_target_2 = torch.clone(states_2)
+
         phi_1 = self.en_model.forward(states_1, actions_1, timesteps_1, attention_mask_1).detach()
         phi_2 = self.en_model.forward(states_2, actions_2, timesteps_2, attention_mask_2).detach()
-        positive = torch.cat((phi_1[lb] , phi_2[rb]),0)
-        negative = torch.cat((phi_2[lb] , phi_1[rb]),0)
-        anchor = self.w.expand(positive.shape[0], -1)
-        pref_loss = self.triplet_loss(anchor, positive, negative)
-        self.w_optimizer.zero_grad()
-        (pref_loss).backward()
-        self.w_optimizer.step()
+
+        phi_1 = phi_1.expand(states_1.shape[1], -1, -1).permute(1, 0, 2)
+        state_preds_1, action_preds_1, reward_preds_1 = self.de_model.forward(
+            states_1+torch.randn_like(states_1)*1e-1, actions_1, None, phi_1, timesteps_1, attention_mask=attention_mask_1,
+        )
+        phi_2 = phi_2.expand(states_2.shape[1], -1, -1).permute(1, 0, 2)
+        state_preds_2, action_preds_2, reward_preds_2 = self.de_model.forward(
+            states_2+torch.randn_like(states_2)*1e-1, actions_2, None, phi_2, timesteps_2, attention_mask=attention_mask_2,
+        )
+
+        act_dim = action_preds_1.shape[2]
+        action_preds_1 = action_preds_1.reshape(-1, act_dim)[attention_mask_1.reshape(-1) > 0]
+        action_target_1 = action_target_1.reshape(-1, act_dim)[attention_mask_1.reshape(-1) > 0]
+
+        act_dim = action_preds_2.shape[2]
+        action_preds_2 = action_preds_2.reshape(-1, act_dim)[attention_mask_2.reshape(-1) > 0]
+        action_target_2 = action_target_2.reshape(-1, act_dim)[attention_mask_2.reshape(-1) > 0]
+
+        recon_loss = (self.loss_fn(
+            state_preds_1, action_preds_1, None,
+            state_target_1, action_target_1, None,
+        )
+        + self.loss_fn(
+            state_preds_2, action_preds_2, None,
+            state_target_2, action_target_2, None,
+        ))
+
+        self.optimizer.zero_grad()
+        recon_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.de_model.parameters(), .25)
+        self.optimizer.step()
+
+        for i in range(10):
+            # phi = self.en_model.forward(states, actions, timesteps, attention_mask).detach()
+            # pred_returns = torch.inner(phi, self.w)
+            # regress_loss = self.regress_loss(pred_returns, rtg[:,-1])
+            phi_1 = self.en_model.forward(states_1, actions_1, timesteps_1, attention_mask_1).detach()
+            phi_2 = self.en_model.forward(states_2, actions_2, timesteps_2, attention_mask_2).detach()
+            positive = torch.cat((phi_1[lb] , phi_2[rb]),0)
+            negative = torch.cat((phi_2[lb] , phi_1[rb]),0)
+            anchor = self.w.expand(positive.shape[0], -1)
+            pref_loss = self.triplet_loss(anchor, positive, negative)
+            self.w_optimizer.zero_grad()
+            pref_loss.backward()
+            self.w_optimizer.step()
 
         with torch.no_grad():
             self.diagnostics['training/action_error'] = torch.mean((action_preds_1-action_target_1)**2).detach().cpu().item()
 
-        return pref_loss.detach().cpu().item(), recon_loss.detach().cpu().item(), phi_norm_loss.detach().cpu().item()
+        return pref_loss.detach().cpu().item(), recon_loss.detach().cpu().item(), phi_norm_loss.detach().cpu().item(), phi_recon_loss.detach().cpu()
