@@ -217,7 +217,8 @@ def experiment(
                     (m_returns[3][0][idx], m_returns[3][1][idx]),
                     (m_returns[4][0][idx], m_returns[4][1][idx]),
                     (m_returns[5][0][idx], m_returns[5][1][idx]),
-                    (m_returns[6][0][idx], m_returns[6][1][idx]))
+                    (m_returns[6][0][idx], m_returns[6][1][idx]),
+                    (m_returns[7][0][idx], m_returns[7][1][idx]))
 
         states_1, actions_1, rewards_1, dones_1, rtg_1, timesteps_1, attention_mask_1 = get_batch(
             variant['feedback'])
@@ -226,10 +227,14 @@ def experiment(
 
         assert states_1.size(0) == states_2.size(0) == variant['feedback']
 
+        margin = 0
+        lb = (rtg_1[:,-1,0] - rtg_2[:,-1,0]) > margin
+        rb = (rtg_2[:,-1,0] - rtg_1[:,-1,0]) > margin
+
         m_returns = ((states_1, states_2), (actions_1, actions_2),
                             (rewards_1, rewards_2), (dones_1, dones_2),
                             (rtg_1, rtg_2), (timesteps_1, timesteps_2),
-                            (attention_mask_1, attention_mask_2))
+                            (attention_mask_1, attention_mask_2), (lb, rb))
         return collect_pref_pairs(batch_size, mode)
 
 

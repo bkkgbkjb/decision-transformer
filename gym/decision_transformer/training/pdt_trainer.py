@@ -104,15 +104,15 @@ class PDTTrainer(Trainer):
     def train_step(self):
         # states_1, actions_1, rewards_1, dones_1, rtg_1, timesteps_1, attention_mask_1 = self.get_batch(self.batch_size)
         # states_2, actions_2, rewards_2, dones_2, rtg_2, timesteps_2, attention_mask_2 = self.get_batch(self.batch_size)
-        (states_1, states_2), (actions_1, actions_2), (rewards_1, rewards_2), (dones_1, dones_2), (rtg_1, rtg_2), (timesteps_1, timesteps_2), (attention_mask_1, attention_mask_2) = self.get_batch(self.batch_size, "pref")
+        (states_1, states_2), (actions_1, actions_2), (rewards_1, rewards_2), (dones_1, dones_2), (rtg_1, rtg_2), (timesteps_1, timesteps_2), (attention_mask_1, attention_mask_2), (lb, rb) = self.get_batch(self.batch_size, "pref")
 
         action_target_1 = torch.clone(actions_1)
         action_target_2 = torch.clone(actions_2)
 
         # pre = (rtg_1[:,0,0]>rtg_2[:,0,0]).to(dtype=torch.float32)
-        margin = 0
-        lb = (rtg_1[:,-1,0] - rtg_2[:,-1,0]) > margin
-        rb = (rtg_2[:,-1,0] - rtg_1[:,-1,0]) > margin
+        # margin = 0
+        # lb = (rtg_1[:,-1,0] - rtg_2[:,-1,0]) > margin
+        # rb = (rtg_2[:,-1,0] - rtg_1[:,-1,0]) > margin
 
         phi_1 = self.en_model.forward(states_1, actions_1, timesteps_1, attention_mask_1)
         phi_2 = self.en_model.forward(states_2, actions_2, timesteps_2, attention_mask_2)
@@ -183,6 +183,10 @@ class PDTTrainer(Trainer):
 
         states_1, actions_1, rewards_1, dones_1, rtg_1, timesteps_1, attention_mask_1 = self.get_batch(self.batch_size, "normal")
         states_2, actions_2, rewards_2, dones_2, rtg_2, timesteps_2, attention_mask_2 = self.get_batch(self.batch_size, "normal")
+
+        margin = 0
+        lb = (rtg_1[:,-1,0] - rtg_2[:,-1,0]) > margin
+        rb = (rtg_2[:,-1,0] - rtg_1[:,-1,0]) > margin
 
         # phi = self.en_model.forward(states, actions, timesteps, attention_mask).detach()
         # pred_returns = torch.inner(phi, self.w)
