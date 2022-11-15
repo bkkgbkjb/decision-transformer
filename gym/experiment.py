@@ -25,6 +25,7 @@ from reporter import get_reporter
 
 from d4rl.infos import REF_MIN_SCORE, REF_MAX_SCORE
 import os
+import math
 
 
 def discount_cumsum(x, gamma):
@@ -49,6 +50,7 @@ def experiment(
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
     exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
 
+    in_antmaze = False
     if env_name == 'hopper':
         env = gym.make('Hopper-v3')
         max_ep_len = 1000
@@ -76,12 +78,14 @@ def experiment(
         max_ep_len = 1001
         env_targets = [1000]
         scale = 1000.
+        in_antmaze = True
     elif env_name == "antmaze-large":
         full_name = f"antmaze-large-{dataset}-v2"
         env = gym.make(full_name)
         max_ep_len = 1001
         env_targets = [1000]
         scale = 1000.
+        in_antmaze = True
     else:
         raise NotImplementedError
     env.seed(variant['seed'])
@@ -101,39 +105,50 @@ def experiment(
     # save all path information into separate lists
     mode = variant.get('mode', 'normal')
     states, traj_lens, returns = [], [], []
+    new_trajectories = []
+    succ_trajectories = []
+    fail_trajectories = []
     for idx, path in enumerate(trajectories):
         if mode == 'delayed':  # delayed: all rewards moved to end of trajectory
             path['rewards'][-1] = path['rewards'].sum()
             path['rewards'][:-1] = 0.
-        # if in_antmaze:
+        if in_antmaze:
 
-        #     i = 0
-        #     reached = False
-        #     for pos in path['observations']:
-        #         if math.sqrt((pos[0] - goal[0]) ** 2 + (pos[1] - goal[1]) ** 2) <= 0.5:
-        #             reached = True
-        #             break
-        #         i += 1
-            
-        #     if i < 10:
-        #         # del trajectories[idx]
-        #         continue
-            
-        #     if reached:
-        #         for k in ['observations', 'actions', 'rewards', 'terminals']:
-        #             path[k] = path[k][:i]
-        #         path['rewards'][:] = 1.0
-        #         path['terminals'][:] = False
-        #         path['terminals'][-1] = True
-        #     else:
-        #         path['rewards'][:] = 0.0
-        #         path['terminals'][:] = False
+            i = 0
+            reached = False
+            for terminal in path['terminals']:
+                # if math.sqrt((pos[0] - goal[0]) ** 2 + (pos[1] - goal[1]) ** 2) <= 0.5:
+                if terminal:
+                    reached = True
+                    break
+                i += 1
 
-        #     path['modified'] = True
-        #     new_trajectories.append(path)
+            if i < 10:
+                # del trajectories[idx]
+                continue
+
+            if reached:
+                for k in ['observations', 'actions', 'rewards', 'terminals']:
+                    path[k] = path[k][:i]
+                path['rewards'][:] = 1.0
+                path['terminals'][:] = False
+                path['terminals'][-1] = True
+            else:
+                path['rewards'][:] = 0.0
+                path['terminals'][:] = False
+
+            path['modified'] = True
+            if reached:
+                succ_trajectories.append(path)
+            else:
+                fail_trajectories.append(path)
+
+            new_trajectories.append(path)
         states.append(path['observations'])
         traj_lens.append(len(path['observations']))
         returns.append(path['rewards'].sum())
+    if in_antmaze:
+        trajectories = new_trajectories
     traj_lens, returns = np.array(traj_lens), np.array(returns)
 
     # used for input normalization
@@ -177,17 +192,41 @@ def experiment(
     # used to reweight sampling so we sample according to timesteps instead of trajectories
     p_sample = traj_lens[sorted_inds] / sum(traj_lens[sorted_inds])
 
-    def get_batch(batch_size=256, max_len=K):
-        batch_inds = np.random.choice(
-            np.arange(num_trajectories),
-            size=batch_size,
-            replace=True,
-            p=p_sample,  # reweights so we sample according to timesteps
-        )
+    def get_batch(batch_size=256, max_len=K, mode = None):
+        nonlocal succ_trajectories
+        nonlocal fail_trajectories
+        if mode is None:
+            batch_inds = np.random.choice(
+                np.arange(num_trajectories),
+                size=batch_size,
+                replace=True,
+                p=p_sample,  # reweights so we sample according to timesteps
+            )
+        elif mode == 'succ':
+            batch_inds = np.random.choice(
+                np.arange(len(succ_trajectories)),
+                size=batch_size,
+                replace=True,
+                # p=p_sample,  # reweights so we sample according to timesteps
+            )
+        elif mode == 'fail':
+            batch_inds = np.random.choice(
+                np.arange(len(fail_trajectories)),
+                size=batch_size,
+                replace=True,
+                # p=p_sample,  # reweights so we sample according to timesteps
+            )
+        else:
+            raise ValueError()
+
+
 
         s, a, r, d, rtg, timesteps, mask = [], [], [], [], [], [], []
         for i in range(batch_size):
-            traj = trajectories[int(sorted_inds[batch_inds[i]])]
+            traj = trajectories[int(sorted_inds[
+                batch_inds[i]])] if mode is None else succ_trajectories[int(
+                    batch_inds[i])] if mode == 'succ' else fail_trajectories[
+                        int(batch_inds[i])]
             si = random.randint(0, traj['rewards'].shape[0] - 1)
 
             # get sequences from dataset
