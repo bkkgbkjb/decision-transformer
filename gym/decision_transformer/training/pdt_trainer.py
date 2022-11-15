@@ -52,6 +52,7 @@ class PDTTrainer(Trainer):
         recon_losses = []
         phi_norm_losses = []
         phi_recon_losses = []
+        phi_pref_losses = []
 
         logs = dict()
 
@@ -60,11 +61,12 @@ class PDTTrainer(Trainer):
         self.en_model.train()
         self.de_model.train()
         for i in range(num_steps):
-            regress_loss, recon_loss, phi_norm_loss, phi_recon_loss = self.train_step()
+            regress_loss, recon_loss, phi_norm_loss, phi_recon_loss, phi_pref_loss = self.train_step()
             regress_losses.append(regress_loss)
             recon_losses.append(recon_loss)
             phi_norm_losses.append(phi_norm_loss)
             phi_recon_losses.append(phi_recon_loss)
+            phi_pref_losses.append(phi_pref_loss)
             if self.scheduler is not None:
                 self.scheduler.step()
 
@@ -92,6 +94,8 @@ class PDTTrainer(Trainer):
         logs['training/phi_recon_loss_std'] = np.std(phi_recon_losses)
         logs['training/phi_norm_loss_mean'] = np.mean(phi_norm_losses)
         logs['training/phi_norm_loss_std'] = np.std(phi_norm_losses)
+        logs['training/phi_pref_loss_mean'] = np.mean(phi_pref_losses)
+        logs['training/phi_pref_loss_std'] = np.std(phi_pref_losses)
         logs['training/used_data_perc'] = self.used_data / self.total_data * 100
         print(self.w)
         for k in self.diagnostics:
@@ -133,7 +137,7 @@ class PDTTrainer(Trainer):
         positive = torch.cat((phi_1[lb], phi_2[rb]), 0)
         negative = torch.cat((phi_2[lb], phi_1[rb]), 0)
         anchor = self.w.expand(positive.shape[0], -1).detach()
-        pref_loss = self.triplet_loss(anchor, positive, negative)
+        phi_pref_loss = self.triplet_loss(anchor, positive, negative)
 
         self.total_data = self.total_data + self.batch_size
         self.used_data = self.used_data + positive.shape[0]
@@ -179,7 +183,7 @@ class PDTTrainer(Trainer):
             param.requires_grad = True
 
         en_model_loss = (phi_recon_loss
-                        + self.pref_loss_ratio * pref_loss
+                        + self.pref_loss_ratio * phi_pref_loss
                         + self.phi_norm_loss_ratio * phi_norm_loss)
                         # + 10 * returns_loss
                         # + (phi_norm_loss if self.phi_norm == "soft" else 0)
@@ -198,12 +202,16 @@ class PDTTrainer(Trainer):
         phi_2 = self.en_model.forward(states_2, actions_2, timesteps_2, attention_mask_2).detach()
 
         phi_1 = phi_1.expand(states_1.shape[1], -1, -1).permute(1, 0, 2)
+        states_1 = states_1 + torch.randn_like(states_1) * 0.1
+        actions_1 = actions_1 * 0
         state_preds_1, action_preds_1, reward_preds_1 = self.de_model.forward(
-            states_1+torch.randn_like(states_1)*1e-1, actions_1, None, phi_1, timesteps_1, attention_mask=attention_mask_1,
+            states_1, actions_1, None, phi_1, timesteps_1, attention_mask=attention_mask_1,
         )
         phi_2 = phi_2.expand(states_2.shape[1], -1, -1).permute(1, 0, 2)
+        states_2 = states_2 + torch.randn_like(states_2) * 0.1
+        actions_2 = actions_2 * 0
         state_preds_2, action_preds_2, reward_preds_2 = self.de_model.forward(
-            states_2+torch.randn_like(states_2)*1e-1, actions_2, None, phi_2, timesteps_2, attention_mask=attention_mask_2,
+            states_2, actions_2, None, phi_2, timesteps_2, attention_mask=attention_mask_2,
         )
 
         act_dim = action_preds_1.shape[2]
@@ -245,4 +253,8 @@ class PDTTrainer(Trainer):
         with torch.no_grad():
             self.diagnostics['training/action_error'] = torch.mean((action_preds_1-action_target_1)**2).detach().cpu().item()
 
-        return pref_loss.detach().cpu().item(), recon_loss.detach().cpu().item(), phi_norm_loss.detach().cpu().item(), phi_recon_loss.detach().cpu()
+        return (pref_loss.detach().cpu().item(),
+                recon_loss.detach().cpu().item(),
+                phi_norm_loss.detach().cpu().item(),
+                phi_recon_loss.detach().cpu(),
+                phi_pref_loss.detach().cpu())
