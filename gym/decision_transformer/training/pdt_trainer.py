@@ -24,7 +24,8 @@ class PDTTrainer(Trainer):
         scheduler=None,
         eval_fns=None,
         pref_loss_ratio=0.1,
-        phi_norm_loss_ratio=0.1
+        phi_norm_loss_ratio=0.1,
+        params = None
     ):
         super().__init__(None, optimizer, batch_size, get_batch, loss_fn, scheduler, eval_fns)
         self.en_model = en_model
@@ -44,6 +45,10 @@ class PDTTrainer(Trainer):
 
         self.total_data = 0
         self.used_data = 0
+        self.k = params['k']
+        self.state_dim = params['state_dim']
+        self.action_dim = params['action_dim']
+        self.z_dim = params['z_dim']
 
     def train_iteration(self, num_steps, iter_num=0, print_logs=False):
 
@@ -106,8 +111,54 @@ class PDTTrainer(Trainer):
         return logs
 
     def train_step(self):
-        states_1, actions_1, rewards_1, dones_1, rtg_1, timesteps_1, attention_mask_1 = self.get_batch(self.batch_size, mode='succ')
-        states_2, actions_2, rewards_2, dones_2, rtg_2, timesteps_2, attention_mask_2 = self.get_batch(self.batch_size, mode='fail')
+        states_1 = torch.empty((0, self.k, self.state_dim), dtype=torch.float32).to(self.device)
+        actions_1 = torch.empty((0, self.k, self.action_dim), dtype=torch.float32).to(self.device)
+        rtg_1 = torch.empty((0, self.k+1, 1), dtype=torch.float32).to(self.device)
+        timesteps_1 = torch.empty((0, self.k), dtype=torch.long).to(self.device)
+        attention_mask_1 = torch.empty((0, self.k), dtype=torch.float64).to(self.device)
+        states_2 = torch.empty((0, self.k, self.state_dim), dtype=torch.float32).to(self.device)
+        actions_2 = torch.empty((0, self.k, self.action_dim), dtype=torch.float32).to(self.device)
+        rtg_2 = torch.empty((0, self.k+1, 1), dtype=torch.float32).to(self.device)
+        timesteps_2 = torch.empty((0, self.k), dtype=torch.long).to(self.device)
+        attention_mask_2 = torch.empty((0, self.k), dtype=torch.float64).to(self.device)
+        l = 0        
+
+        while l < self.batch_size:
+            _states_1, _actions_1, _, _, _rtg_1, _timesteps_1, _attention_mask_1 = self.get_batch(self.batch_size * 10)
+            _states_2, _actions_2, _, _, _rtg_2, _timesteps_2, _attention_mask_2 = self.get_batch(self.batch_size * 10)
+
+            margin = 0
+            lb = (_rtg_1[:,-1,0] - _rtg_2[:,-1,0]) > margin
+            rb = (_rtg_2[:,-1,0] - _rtg_1[:,-1,0]) > margin
+
+            useful = torch.cat((_states_1[lb], _states_2[rb]), 0)
+            l += useful.size(0)
+
+            states_1 = torch.cat((states_1, _states_1[lb], _states_1[rb]), 0)
+            actions_1 = torch.cat((actions_1, _actions_1[lb], _actions_1[rb]), 0)
+            rtg_1 = torch.cat((rtg_1, _rtg_1[lb], _rtg_1[rb]), 0)
+            timesteps_1 = torch.cat((timesteps_1, _timesteps_1[lb], _timesteps_1[rb]), 0)
+            attention_mask_1 = torch.cat((attention_mask_1, _attention_mask_1[lb], _attention_mask_1[rb]), 0)
+            states_2 = torch.cat((states_2, _states_2[lb], _states_2[rb]), 0)
+            actions_2 = torch.cat((actions_2, _actions_2[lb], _actions_2[rb]), 0)
+            rtg_2 = torch.cat((rtg_2, _rtg_2[lb], _rtg_2[rb]), 0)
+            timesteps_2 = torch.cat((timesteps_2, _timesteps_2[lb], _timesteps_2[rb]), 0)
+            attention_mask_2 = torch.cat((attention_mask_2, _attention_mask_2[lb], _attention_mask_2[rb]), 0)
+        
+        states_1 = states_1[:self.batch_size]
+        actions_1 = actions_1[:self.batch_size]
+        rtg_1 = rtg_1[:self.batch_size]
+        timesteps_1 = timesteps_1[:self.batch_size]
+        attention_mask_1 = attention_mask_1[:self.batch_size]
+        states_2 = states_2[:self.batch_size]
+        actions_2 = actions_2[:self.batch_size]
+        rtg_2 = rtg_2[:self.batch_size]
+        timesteps_2 = timesteps_2[:self.batch_size]
+        attention_mask_2 = attention_mask_2[:self.batch_size]
+        margin = 0
+        lb = (rtg_1[:,-1,0] - rtg_2[:,-1,0]) > margin
+        rb = (rtg_2[:,-1,0] - rtg_1[:,-1,0]) > margin
+
 
         action_target_1 = torch.clone(actions_1)
         action_target_2 = torch.clone(actions_2)
@@ -115,9 +166,6 @@ class PDTTrainer(Trainer):
         state_target_2 = torch.clone(states_2)
 
         # pre = (rtg_1[:,0,0]>rtg_2[:,0,0]).to(dtype=torch.float32)
-        margin = 0
-        lb = (rtg_1[:,-1,0] - rtg_2[:,-1,0]) > margin
-        rb = (rtg_2[:,-1,0] - rtg_1[:,-1,0]) > margin
 
         phi_1 = self.en_model.forward(states_1, actions_1, timesteps_1, attention_mask_1)
         phi_2 = self.en_model.forward(states_2, actions_2, timesteps_2, attention_mask_2)
