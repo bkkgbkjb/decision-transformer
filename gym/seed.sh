@@ -6,16 +6,12 @@ nohup python experiment.py --env hopper --dataset medium --seed 100 &>hm100.log 
 sleep 2
 nohup python experiment.py --env hopper --dataset medium --seed 200 &>hm200.log &
 sleep 2
-nohup python experiment.py --env hopper --dataset medium --seed 300 &>hm300.log &
-sleep 2
 
 nohup python experiment.py --env hopper --dataset medium-replay --seed 0 --force-save-model True &>hmr0.log &
 sleep 2
 nohup python experiment.py --env hopper --dataset medium-replay --seed 100 &>hmr100.log &
 sleep 2
 nohup python experiment.py --env hopper --dataset medium-replay --seed 200 &>hmr200.log &
-sleep 2
-nohup python experiment.py --env hopper --dataset medium-replay --seed 300 &>hmr300.log &
 sleep 2
 
 nohup python experiment.py --env hopper --dataset medium-expert --seed 0 --force-save-model True &>hme0.log &
@@ -24,63 +20,49 @@ nohup python experiment.py --env hopper --dataset medium-expert --seed 100 &>hme
 sleep 2
 nohup python experiment.py --env hopper --dataset medium-expert --seed 200 &>hme200.log &
 sleep 2
-nohup python experiment.py --env hopper --dataset medium-expert --seed 300 &>hme300.log &
-sleep 2
 
 
 export CUDA_VISIBLE_DEVICES=2
-nohup python experiment.py --env walker2d --dataset medium --seed 0 --force-save-model True &>wm0.log &
+nohup python experiment.py --env hopper --dataset medium --seed 0 --force-save-model True --feedback 3000 &>wm0.log &
 sleep 2
-nohup python experiment.py --env walker2d --dataset medium --seed 100 &>wm100.log &
+nohup python experiment.py --env hopper --dataset medium --seed 100 --feedback 3000 &>wm100.log &
 sleep 2
-nohup python experiment.py --env walker2d --dataset medium --seed 200 &>wm200.log &
-sleep 2
-nohup python experiment.py --env walker2d --dataset medium --seed 300 &>wm300.log &
+nohup python experiment.py --env hopper --dataset medium --seed 200 --feedback 3000 &>wm200.log &
 sleep 2
 
-nohup python experiment.py --env walker2d --dataset medium-expert --seed 0 --force-save-model True &>wme0.log &
+nohup python experiment.py --env hopper --dataset medium-expert --seed 0 --force-save-model True --feedback 3000 &>wme0.log &
 sleep 2
-nohup python experiment.py --env walker2d --dataset medium-expert --seed 100 &>wme100.log &
+nohup python experiment.py --env hopper --dataset medium-expert --seed 100 --feedback 3000 &>wme100.log &
 sleep 2
-nohup python experiment.py --env walker2d --dataset medium-expert --seed 200 &>wme200.log &
-sleep 2
-nohup python experiment.py --env walker2d --dataset medium-expert --seed 300 &>wme300.log &
+nohup python experiment.py --env hopper --dataset medium-expert --seed 200 --feedback 3000 &>wme200.log &
 sleep 2
 
-nohup python experiment.py --env walker2d --dataset medium-replay --seed 0 --force-save-model True &>wmr0.log &
+nohup python experiment.py --env hopper --dataset medium-replay --seed 0 --force-save-model True --feedback 3000 &>wmr0.log &
 sleep 2
-nohup python experiment.py --env walker2d --dataset medium-replay --seed 100 &>wmr100.log &
+nohup python experiment.py --env hopper --dataset medium-replay --seed 100 --feedback 3000 &>wmr100.log &
 sleep 2
-nohup python experiment.py --env walker2d --dataset medium-replay --seed 200 &>wmr200.log &
-sleep 2
-nohup python experiment.py --env walker2d --dataset medium-replay --seed 300 &>wmr300.log &
+nohup python experiment.py --env hopper --dataset medium-replay --seed 200 --feedback 3000 &>wmr200.log &
 sleep 2
 
 
 export CUDA_VISIBLE_DEVICES=3
-nohup python experiment.py --env halfcheetah --dataset medium --seed 0 --force-save-model True &>cm0.log &
+nohup python experiment.py --env hopper --dataset medium --seed 0 --force-save-model True --feedback 500 &>cm0.log &
 sleep 2
-nohup python experiment.py --env halfcheetah --dataset medium --seed 100 &>cm100.log &
+nohup python experiment.py --env hopper --dataset medium --seed 100 --feedback 500 &>cm100.log &
 sleep 2
-nohup python experiment.py --env halfcheetah --dataset medium --seed 200 &>cm200.log &
-sleep 2
-nohup python experiment.py --env halfcheetah --dataset medium --seed 300 &>cm300.log &
+nohup python experiment.py --env hopper --dataset medium --seed 200 --feedback 500 &>cm200.log &
 sleep 2
 
-nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 0 --phi_norm_loss_ratio 0.05 --pref_loss_ratio 0.25 --w_lr 0.01 --force-save-model True &>cme0.log &
+nohup python experiment.py --env hopper --dataset medium-expert --seed 0 --force-save-model True --feedback 500 &>cme0.log &
 sleep 2
-nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 100 --phi_norm_loss_ratio 0.05 --pref_loss_ratio 0.25 --w_lr 0.01 &>cme100.log &
+nohup python experiment.py --env hopper --dataset medium-expert --seed 100 --feedback 500 &>cme100.log &
 sleep 2
-nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 200 --phi_norm_loss_ratio 0.05 --pref_loss_ratio 0.25 --w_lr 0.01 &>cme200.log &
-sleep 2
-nohup python experiment.py --env halfcheetah --dataset medium-expert --seed 300 --phi_norm_loss_ratio 0.05 --pref_loss_ratio 0.25 --w_lr 0.01 &>cme300.log &
+nohup python experiment.py --env hopper --dataset medium-expert --seed 200 --feedback 500 &>cme200.log &
 sleep 2
 
-nohup python experiment.py --env halfcheetah --dataset medium-replay --seed 0 --force-save-model True &>cmr0.log &
+nohup python experiment.py --env hopper --dataset medium-replay --seed 0 --force-save-model True --feedback 500 &>cmr0.log &
 sleep 2
-nohup python experiment.py --env halfcheetah --dataset medium-replay --seed 100 &>cmr100.log &
+nohup python experiment.py --env hopper --dataset medium-replay --seed 100 --feedback 500 &>cmr100.log &
 sleep 2
-nohup python experiment.py --env halfcheetah --dataset medium-replay --seed 200 &>cmr200.log &
-sleep 2
-nohup python experiment.py --env halfcheetah --dataset medium-replay --seed 300 &>cmr300.log &
+nohup python experiment.py --env hopper --dataset medium-replay --seed 200 --feedback 500 &>cmr200.log &
 sleep 2
