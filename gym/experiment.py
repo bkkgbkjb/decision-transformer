@@ -389,8 +389,8 @@ def experiment(
             weight_decay=1e-4
         )
 
-        w = (torch.randn(z_dim) * 2).to(device=device)
-        w.requires_grad = True
+        w = torch.nn.parameter.Parameter(torch.empty(z_dim, requires_grad=True, device=device) * 2)
+        torch.nn.init.normal_(w)
         w_optimizer = torch.optim.AdamW(
             [w],
             lr=variant["w_lr"],
@@ -428,7 +428,7 @@ def experiment(
             batch_size=batch_size,
             get_batch=lambda batch_size, mode: get_batch(batch_size) if mode =='normal' else collect_pref_pairs(batch_size, mode),
             scheduler=scheduler,
-            loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a)**2),
+            loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((s_hat - s)**2) + torch.mean((a_hat - a)**2),
             eval_fns=[eval_episodes(tar) for tar in env_targets],
             device=device,
             pref_loss_ratio=variant["pref_loss_ratio"],
