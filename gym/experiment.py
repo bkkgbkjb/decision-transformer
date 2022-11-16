@@ -114,31 +114,22 @@ def experiment(
             path['rewards'][:-1] = 0.
         if in_antmaze:
 
-            i = 0
-            reached = False
+            i = 0.0
             for terminal in path['terminals']:
                 # if math.sqrt((pos[0] - goal[0]) ** 2 + (pos[1] - goal[1]) ** 2) <= 0.5:
                 if terminal:
-                    reached = True
-                    break
-                i += 1
+                    i+=1.0
 
-            if i < 10:
-                # del trajectories[idx]
-                continue
 
-            if reached:
-                for k in ['observations', 'actions', 'rewards', 'terminals']:
-                    path[k] = path[k][:i]
-                path['rewards'][:] = 1.0
-                path['terminals'][:] = False
-                path['terminals'][-1] = True
-            else:
-                path['rewards'][:] = 0.0
-                path['terminals'][:] = False
+            for k in ['observations', 'actions', 'rewards', 'terminals']:
+                path[k] = path[k][:]
+            path['rewards'][:] = i
+            path['terminals'][:] = False
+            path['terminals'][-1] = True
+
 
             path['modified'] = True
-            if reached:
+            if i > 0:
                 succ_trajectories.append(path)
             else:
                 fail_trajectories.append(path)
