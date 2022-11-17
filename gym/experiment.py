@@ -445,7 +445,7 @@ def experiment(
             params = {"state_dim": state_dim, "action_dim": act_dim, "z_dim": variant['z_dim'], "k": variant['K']}
         )
 
-    name = f"{variant['env']}-{variant['dataset']}-{variant['model_type']}-{variant['seed']}-{datetime.now().strftime('%m-%d-%H-%M-%S-%f')}"
+    name = f"pointmaze-{variant['env']}-{variant['dataset']}-{variant['model_type']}-{variant['seed']}-{datetime.now().strftime('%m-%d-%H-%M-%S-%f')}"
     if log_to_wandb:
         # wandb.init(
         #     name=exp_prefix,
