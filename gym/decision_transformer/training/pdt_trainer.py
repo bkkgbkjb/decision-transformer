@@ -124,8 +124,8 @@ class PDTTrainer(Trainer):
         l = 0        
 
         while l < self.batch_size:
-            _states_1, _actions_1, _, _, _rtg_1, _timesteps_1, _attention_mask_1 = self.get_batch(self.batch_size * 10)
-            _states_2, _actions_2, _, _, _rtg_2, _timesteps_2, _attention_mask_2 = self.get_batch(self.batch_size * 10)
+            _states_1, _actions_1, _, _, _rtg_1, _timesteps_1, _attention_mask_1 = self.get_batch(self.batch_size)
+            _states_2, _actions_2, _, _, _rtg_2, _timesteps_2, _attention_mask_2 = self.get_batch(self.batch_size)
 
             margin = 0
             lb = (_rtg_1[:,-1,0] - _rtg_2[:,-1,0]) > margin

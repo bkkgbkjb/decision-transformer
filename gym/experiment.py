@@ -7,6 +7,7 @@ import torch
 import wandb
 import json
 from args import args
+from gym.wrappers import time_limit
 
 import argparse
 import pickle
@@ -28,11 +29,11 @@ import os
 import math
 
 
-def discount_cumsum(x, gamma):
+def discount_cumsum(x, gamma, initial, target):
     discount_cumsum = np.zeros_like(x)
-    discount_cumsum[-1] = x[-1]
-    for t in reversed(range(x.shape[0]-1)):
-        discount_cumsum[t] = x[t] + gamma * discount_cumsum[t+1]
+    # discount_cumsum[:] = np.exp(-np.linalg.norm(x[-1] - np.array(target))) - np.exp(-np.linalg.norm(x[0] - np.array(target)))
+
+    discount_cumsum[:] = x[-1] - np.exp(-np.linalg.norm(initial - np.array(target)))
     return discount_cumsum
 
 
@@ -86,9 +87,31 @@ def experiment(
         env_targets = [10.]
         scale = 10.
         in_antmaze = True
+    elif env_name == "maze2d-umaze":
+        full_name = f"maze2d-umaze-v1"
+        env = gym.make(full_name)
+        max_ep_len = env._max_episode_steps
+        env_targets = [10.]
+        scale = 1.
+        in_antmaze = True
+    elif env_name == "maze2d-medium":
+        full_name = f"maze2d-medium-v1"
+        env = gym.make(full_name)
+        max_ep_len = env._max_episode_steps
+        env_targets = [10.]
+        scale = 0.1
+        in_antmaze = True
+    elif env_name == "maze2d-large":
+        full_name = f"maze2d-large-v1"
+        env = gym.make(full_name)
+        max_ep_len = env._max_episode_steps
+        env_targets = [10.]
+        scale = 0.1
+        in_antmaze = True
     else:
         raise NotImplementedError
     env.seed(variant['seed'])
+    print(f"max_ep_len is: {max_ep_len}")
 
     if model_type == 'bc':
         env_targets = env_targets[:1]  # since BC ignores target, no need for different evaluations
@@ -98,7 +121,7 @@ def experiment(
 
     # load dataset
     dir_path = variant.get('dirpath', '.')
-    dataset_path = f'{dir_path}/data/{env_name}-{dataset}-v2.pkl'
+    dataset_path = f'{dir_path}/data/{env_name}-{dataset}-v1.pkl'
     with open(dataset_path, 'rb') as f:
         trajectories = pickle.load(f)
 
@@ -144,8 +167,8 @@ def experiment(
     print(f'z_dim is: {z_dim}')
     print(f"reward foresee is: {variant['foresee']}")
 
-    expert_score = REF_MAX_SCORE[f"{variant['env']}-{variant['dataset']}-v2"]
-    random_score = REF_MIN_SCORE[f"{variant['env']}-{variant['dataset']}-v2"]
+    expert_score = REF_MAX_SCORE[f"{variant['env']}-v1"]
+    random_score = REF_MIN_SCORE[f"{variant['env']}-v1"]
     print(f"max score is: {expert_score}, min score is {random_score}")
 
     # only train on top pct_traj trajectories (for %BC experiment)
@@ -193,7 +216,7 @@ def experiment(
                 if not variant['subepisode']:
                     rtg.append(discount_cumsum(traj['rewards'][0:], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
                 else:
-                    rtg.append(discount_cumsum(traj['rewards'][si:si+variant['foresee']], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
+                    rtg.append(discount_cumsum(traj['rewards'][si:si+variant['foresee']], initial=traj['observations'][si, :2], target=env.unwrapped._target , gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
                     # rtg.append((np.sum(traj['rewards'][si:si + s[-1].shape[1]])).reshape(1,1,1).repeat(s[-1].shape[1] + 1, axis=1))
 
             else:

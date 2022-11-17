@@ -199,6 +199,8 @@ def evaluate_episode_phi(
 
         state, reward, done, _ = env.step(action)
 
+        if reward > 0:
+            done = True
         cur_state = torch.from_numpy(state).to(device=device).reshape(1, state_dim)
         states = torch.cat([states, cur_state], dim=0)
         rewards[-1] = reward
