@@ -7,7 +7,6 @@ import torch
 import wandb
 import json
 from args import args
-from gym.wrappers import time_limit
 
 import argparse
 import pickle
@@ -92,7 +91,7 @@ def experiment(
         env = gym.make(full_name)
         max_ep_len = env._max_episode_steps
         env_targets = [10.]
-        scale = 1.
+        scale = 0.1
         in_antmaze = True
     elif env_name == "maze2d-medium":
         full_name = f"maze2d-medium-v1"
