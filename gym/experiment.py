@@ -29,11 +29,16 @@ from d4rl.infos import REF_MIN_SCORE, REF_MAX_SCORE
 import os
 
 
-def discount_cumsum(x, gamma):
+def discount_cumsum_old(x, gamma):
     discount_cumsum = np.zeros_like(x)
     discount_cumsum[-1] = x[-1]
     for t in reversed(range(x.shape[0]-1)):
         discount_cumsum[t] = x[t] + gamma * discount_cumsum[t+1]
+    return discount_cumsum
+
+def discount_cumsum_new(x, gamma, initial, target):
+    discount_cumsum = np.zeros_like(x)
+    discount_cumsum[:] = x[-1] - np.exp(-np.linalg.norm(initial - np.array(target)))
     return discount_cumsum
 
 
@@ -144,8 +149,8 @@ def experiment(
     print(f'z_dim is: {z_dim}')
     print(f"reward foresee is: {variant['foresee']}")
 
-    expert_score = REF_MAX_SCORE[f"{variant['env']}-{variant['dataset']}-v1"]
-    random_score = REF_MIN_SCORE[f"{variant['env']}-{variant['dataset']}-v1"]
+    expert_score = REF_MAX_SCORE[f"{variant['env']}-v1"]
+    random_score = REF_MIN_SCORE[f"{variant['env']}-v1"]
     print(f"max score is: {expert_score}, min score is {random_score}")
 
     # only train on top pct_traj trajectories (for %BC experiment)
@@ -202,13 +207,14 @@ def experiment(
 
             else:
                 if rew_tra:
-                    rtg.append(discount_cumsum(traj['rewards'][si:si+K], gamma=1.)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
+                    rtg.append(discount_cumsum_new(traj['rewards'][si:si+K], gamma=1., initial=traj['observations'][si, :2], target=env.unwrapped._target)[0].reshape(1, 1, 1).repeat(s[-1].shape[1] + 1, axis=1))
                 elif reward_model != None:
                     s_temp = torch.from_numpy(traj['observations'][si:]).to(device=device)
                     a_temp = torch.from_numpy(traj['actions'][si:]).to(device=device)
                     r_temp = reward_model(s_temp, a_temp).detach().cpu().numpy()
-                    rtg.append(discount_cumsum(r_temp, gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
+                    rtg.append(discount_cumsum_old(r_temp, gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
                 else:
+                    assert False
                     rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
             # print(f"rtg is: {rtg[-1]}")
 
