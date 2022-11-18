@@ -51,6 +51,7 @@ def experiment(
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
     exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
 
+    in_antmaze = False
     if env_name == 'hopper':
         env = gym.make('Hopper-v3')
         max_ep_len = 1000
@@ -72,6 +73,27 @@ def experiment(
         max_ep_len = 100
         env_targets = [76, 40]
         scale = 10.
+    elif env_name == "maze2d-umaze":
+        full_name = f"maze2d-umaze-v1"
+        env = gym.make(full_name)
+        max_ep_len = env._max_episode_steps
+        env_targets = [1.]
+        scale = 1
+        in_antmaze = True
+    elif env_name == "maze2d-medium":
+        full_name = f"maze2d-medium-v1"
+        env = gym.make(full_name)
+        max_ep_len = env._max_episode_steps
+        env_targets = [1.]
+        scale = 1
+        in_antmaze = True
+    elif env_name == "maze2d-large":
+        full_name = f"maze2d-large-v1"
+        env = gym.make(full_name)
+        max_ep_len = env._max_episode_steps
+        env_targets = [1.]
+        scale = 1
+        in_antmaze = True
     else:
         raise NotImplementedError
     env.seed(variant['seed'])
@@ -84,7 +106,7 @@ def experiment(
 
     # load dataset
     dir_path = variant.get('dirpath', '.')
-    dataset_path = f'{dir_path}/data/{env_name}-{dataset}-v2.pkl'
+    dataset_path = f'{dir_path}/data/{env_name}-{dataset}-v1.pkl'
     with open(dataset_path, 'rb') as f:
         trajectories = pickle.load(f)
 
@@ -122,8 +144,8 @@ def experiment(
     print(f'z_dim is: {z_dim}')
     print(f"reward foresee is: {variant['foresee']}")
 
-    expert_score = REF_MAX_SCORE[f"{variant['env']}-{variant['dataset']}-v2"]
-    random_score = REF_MIN_SCORE[f"{variant['env']}-{variant['dataset']}-v2"]
+    expert_score = REF_MAX_SCORE[f"{variant['env']}-{variant['dataset']}-v1"]
+    random_score = REF_MIN_SCORE[f"{variant['env']}-{variant['dataset']}-v1"]
     print(f"max score is: {expert_score}, min score is {random_score}")
 
     # only train on top pct_traj trajectories (for %BC experiment)
@@ -437,7 +459,7 @@ def experiment(
             eval_fns=[eval_episodes(tar) for tar in env_targets],
         )
 
-    name = f"dtpb-{variant['env']}-{variant['dataset']}-{variant['model_type']}-{variant['seed']}-{datetime.now().strftime('%f')}"
+    name = f"dtpb_pointmaze-{variant['env']}-{variant['dataset']}-{variant['model_type']}-{variant['seed']}-{datetime.now().strftime('%m-%d-%H-%M-%S-%f')}"
     if log_to_wandb:
         # wandb.init(
         #     name=exp_prefix,
