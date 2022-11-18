@@ -82,21 +82,21 @@ def experiment(
         full_name = f"maze2d-umaze-v1"
         env = gym.make(full_name)
         max_ep_len = env._max_episode_steps
-        env_targets = [1.]
+        env_targets = [max_ep_len]
         scale = 1
         in_antmaze = True
     elif env_name == "maze2d-medium":
         full_name = f"maze2d-medium-v1"
         env = gym.make(full_name)
         max_ep_len = env._max_episode_steps
-        env_targets = [1.]
+        env_targets = [max_ep_len]
         scale = 1
         in_antmaze = True
     elif env_name == "maze2d-large":
         full_name = f"maze2d-large-v1"
         env = gym.make(full_name)
         max_ep_len = env._max_episode_steps
-        env_targets = [1.]
+        env_targets = [max_ep_len]
         scale = 1
         in_antmaze = True
     else:
