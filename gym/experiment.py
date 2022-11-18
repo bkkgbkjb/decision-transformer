@@ -28,11 +28,11 @@ import os
 import math
 
 
-def discount_cumsum(x, gamma, initial, target):
+def discount_cumsum(x, gamma):
     discount_cumsum = np.zeros_like(x)
-    # discount_cumsum[:] = np.exp(-np.linalg.norm(x[-1] - np.array(target))) - np.exp(-np.linalg.norm(x[0] - np.array(target)))
-
-    discount_cumsum[:] = x[-1] - np.exp(-np.linalg.norm(initial - np.array(target)))
+    discount_cumsum[-1] = x[-1]
+    for t in reversed(range(x.shape[0]-1)):
+        discount_cumsum[t] = x[t] + gamma * discount_cumsum[t+1]
     return discount_cumsum
 
 
@@ -90,22 +90,22 @@ def experiment(
         full_name = f"maze2d-umaze-v1"
         env = gym.make(full_name)
         max_ep_len = env._max_episode_steps
-        env_targets = [10.]
-        scale = 0.1
+        env_targets = [max_ep_len * 1]
+        scale = 1
         in_antmaze = True
     elif env_name == "maze2d-medium":
         full_name = f"maze2d-medium-v1"
         env = gym.make(full_name)
         max_ep_len = env._max_episode_steps
-        env_targets = [10.]
-        scale = 0.1
+        env_targets = [max_ep_len * 1]
+        scale = 1
         in_antmaze = True
     elif env_name == "maze2d-large":
         full_name = f"maze2d-large-v1"
         env = gym.make(full_name)
         max_ep_len = env._max_episode_steps
-        env_targets = [10.]
-        scale = 0.1
+        env_targets = [max_ep_len * 1]
+        scale = 1
         in_antmaze = True
     else:
         raise NotImplementedError
@@ -223,7 +223,6 @@ def experiment(
             # print(f"rtg is: {rtg[-1]}")
 
             if rtg[-1].shape[1] <= s[-1].shape[1]:
-                assert False
                 rtg[-1] = np.concatenate([rtg[-1], np.zeros((1, 1, 1))], axis=1)
 
             # padding and state + reward normalization
@@ -445,7 +444,7 @@ def experiment(
             params = {"state_dim": state_dim, "action_dim": act_dim, "z_dim": variant['z_dim'], "k": variant['K']}
         )
 
-    name = f"pointmaze-{variant['env']}-{variant['dataset']}-{variant['model_type']}-{variant['seed']}-{datetime.now().strftime('%m-%d-%H-%M-%S-%f')}"
+    name = f"dt-{variant['env']}-{variant['dataset']}-{variant['model_type']}-{variant['seed']}-{datetime.now().strftime('%m-%d-%H-%M-%S-%f')}"
     if log_to_wandb:
         # wandb.init(
         #     name=exp_prefix,
